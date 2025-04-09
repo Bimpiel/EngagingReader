@@ -1,22 +1,11 @@
 import os
-import json
-import tempfile
 import glob
 import base64
 from flask import Flask, render_template, request, jsonify
 from google import genai
 from google.genai import types
 
-# Check if the GOOGLE_APPLICATION_CREDENTIALS environment variable is set
-google_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
-
-if google_credentials:
-    # If the environment variable is set, save it to a temporary file
-    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as temp_file:
-        temp_file.write(google_credentials)
-        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_file.name
-else:
-    raise EnvironmentError("Google credentials are missing. Please set the GOOGLE_APPLICATION_CREDENTIALS environment variable.")
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service_account_file.json"
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
@@ -130,7 +119,7 @@ for example: Agglomeration. The operating budget of $92.7 million finances (i) l
             top_p=0.95,
             max_output_tokens=8192,
             response_modalities=["TEXT"],
-            safety_settings=[ 
+            safety_settings=[
                 types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
                 types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
                 types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
