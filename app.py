@@ -26,13 +26,9 @@ def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
 
 def process_image(image_path):
     """Process the image using Gemini AI and return extracted text."""
-    text_prompt = types.Part.from_text(text="""
-    Read the text in this image. Ignore any words in French. Preserve the tables as rich tables. 
-    If there are footnotes in the table make sure to include them under the table. 
-    Write the entire response using markdown format.
+    text_prompt = types.Part.from_text(text="""Read the text in this image. Ignore any words in French. Preserve the tables as rich tables. If there are footnotes in the table make sure to include them under the table. Write the entire response using markdown format.
 
-    Check your work to make sure you included all of the English language text not in the tables.
-    """)
+    Check your work to make sure you included all of the English language text not in the tables.""")
 
     with open(image_path, "rb") as img_file:
         img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
@@ -102,14 +98,14 @@ def get_definition():
         # Prepare the prompt for Gemini
         text_prompt = types.Part.from_text(text=f"""input: {word}. {context}
 output:""")
-        
+
         system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word you respond in the following format:
 
 **Word**
 
 Definition and what it means in context of the sentence
 Provide your response in markdown format. Make sure that your responses are accessible for adults with a reading level between grade 4 and 7.
-for example: Agglomeration. The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit is an  input and  the output would be Definition: Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.""")
+for example: Agglomeration. The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit is an input and the output would be Definition: Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.""")
 
         contents = [
             types.Content(
@@ -148,5 +144,6 @@ for example: Agglomeration. The operating budget of $92.7 million finances (i) l
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+# Make sure the app binds to the correct interface and port
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(debug=True, host="0.0.0.0", port=os.environ.get("PORT", 5000))
