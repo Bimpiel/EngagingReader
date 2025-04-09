@@ -2,9 +2,8 @@ import os
 import glob
 import base64
 from flask import Flask, render_template, request, jsonify
-import google.generativeai as genai
-from google.generativeai import types
-
+from google import genai
+from google.genai import types
 
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service_account_file.json"
 
