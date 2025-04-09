@@ -1,12 +1,22 @@
 import os
+import json
+import tempfile
 import glob
 import base64
 from flask import Flask, render_template, request, jsonify
 from google import genai
 from google.genai import types
 
-# Use environment variable for credentials instead of hardcoding the path
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+# Check if the GOOGLE_APPLICATION_CREDENTIALS environment variable is set
+google_credentials = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+
+if google_credentials:
+    # If the environment variable is set, save it to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, mode='w', suffix='.json') as temp_file:
+        temp_file.write(google_credentials)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = temp_file.name
+else:
+    raise EnvironmentError("Google credentials are missing. Please set the GOOGLE_APPLICATION_CREDENTIALS environment variable.")
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
