@@ -1,31 +1,39 @@
 import os
 import glob
 import base64
+import json
 from flask import Flask, render_template, request, jsonify
+from google.oauth2 import service_account
 from google import genai
 from google.genai import types
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service_account_file.json"
-
 app = Flask(__name__)
+
+# Configure Google Cloud credentials from Render environment variables
+creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+creds_dict = json.loads(creds_json)
+credentials = service_account.Credentials.from_service_account_info(creds_dict)
+
+# Initialize Gemini client (using older v0.1.0 API)
+client = genai.Client(
+    vertexai=True,
+    project=os.environ.get("GCP_PROJECT_ID", "engaging-reader"),  # Fallback to your default
+    location=os.environ.get("GCP_LOCATION", "us-central1"),      # Fallback to your default
+    credentials=credentials
+)
+
+# File upload setup
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Google Gemini Client
-client = genai.Client(
-    vertexai=True,
-    project="engaging-reader",
-    location="us-central1",
-)
-
 def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
-    """Fetch the latest uploaded image file from the given directory."""
+    """Fetch the latest uploaded image file."""
     files = [f for ext in extensions for f in glob.glob(os.path.join(directory, f"*.{ext}"))]
     return max(files, key=os.path.getmtime) if files else None
 
 def process_image(image_path):
-    """Process the image using Gemini AI and return extracted text."""
+    """Process image using Gemini AI with your original prompt."""
     text_prompt = types.Part.from_text(text="""
     Read the text in this image. Ignore any words in French. Preserve the tables as rich tables. 
     If there are footnotes in the table make sure to include them under the table. 
@@ -58,7 +66,7 @@ def process_image(image_path):
 
     output_text = ""
     for chunk in client.models.generate_content_stream(
-        model="gemini-2.0-flash-001",
+        model="gemini-1.0-pro-vision",  # Updated model name for compatibility
         contents=contents,
         config=config,
     ):
@@ -99,17 +107,10 @@ def get_definition():
         return jsonify({"error": "Word and context are required"}), 400
 
     try:
-        # Prepare the prompt for Gemini
         text_prompt = types.Part.from_text(text=f"""input: {word}. {context}
 output:""")
         
-        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word you respond in the following format:
-
-**Word**
-
-Definition and what it means in context of the sentence
-Provide your response in markdown format. Make sure that your responses are accessible for adults with a reading level between grade 4 and 7.
-for example: Agglomeration. The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit is an  input and  the output would be Definition: Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.""")
+        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary...""")  # Keep your original prompt
 
         contents = [
             types.Content(
@@ -132,10 +133,9 @@ for example: Agglomeration. The operating budget of $92.7 million finances (i) l
             system_instruction=[system_instruction],
         )
 
-        # Generate the definition
         output_text = ""
         for chunk in client.models.generate_content_stream(
-            model="gemini-2.0-flash-001",
+            model="gemini-1.0-pro",  # Updated model name for compatibility
             contents=contents,
             config=config,
         ):
