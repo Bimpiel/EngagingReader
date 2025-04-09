@@ -5,7 +5,8 @@ from flask import Flask, render_template, request, jsonify
 from google import genai
 from google.genai import types
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service_account_file.json"
+# Use environment variable for credentials instead of hardcoding the path
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
@@ -119,7 +120,7 @@ for example: Agglomeration. The operating budget of $92.7 million finances (i) l
             top_p=0.95,
             max_output_tokens=8192,
             response_modalities=["TEXT"],
-            safety_settings=[
+            safety_settings=[ 
                 types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
                 types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
                 types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
