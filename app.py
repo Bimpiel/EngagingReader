@@ -1,30 +1,24 @@
 import os
 import glob
 import base64
-import json
 from flask import Flask, render_template, request, jsonify
 from google import genai
-from google.auth import credentials
 from google.genai import types
 
-# Ensure the environment variable for credentials is set in Render
-google_credentials_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
-if google_credentials_json:
-    credentials_info = json.loads(google_credentials_json)
-else:
-    raise ValueError("GOOGLE_APPLICATION_CREDENTIALS environment variable is not set")
-
-# Initialize Google Gemini Client with the credentials
-client = genai.Client(
-    credentials=credentials.Credentials.from_service_account_info(credentials_info),
-    project="engaging-reader",
-    location="us-central1",
-)
+# Use environment variable for credentials instead of hardcoding the path
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
+
+# Google Gemini Client
+client = genai.Client(
+    vertexai=True,
+    project="engaging-reader",
+    location="us-central1",
+)
 
 def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
     """Fetch the latest uploaded image file from the given directory."""
