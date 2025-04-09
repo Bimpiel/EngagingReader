@@ -4,8 +4,8 @@ import base64
 import json
 from flask import Flask, render_template, request, jsonify
 from google.oauth2 import service_account
-from google import genai
-from google.genai import types
+import google.generativeai as genai
+from google.generativeai.types import GenerationConfig, HarmCategory, HarmBlockThreshold
 
 app = Flask(__name__)
 
@@ -14,12 +14,11 @@ creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
 creds_dict = json.loads(creds_json)
 credentials = service_account.Credentials.from_service_account_info(creds_dict)
 
-# Initialize Gemini client (using older v0.1.0 API)
-client = genai.Client(
-    vertexai=True,
-    project=os.environ.get("GCP_PROJECT_ID", "engaging-reader"),  # Fallback to your default
-    location=os.environ.get("GCP_LOCATION", "us-central1"),      # Fallback to your default
-    credentials=credentials
+# Initialize Gemini
+genai.configure(
+    credentials=credentials,
+    project=os.environ.get("GCP_PROJECT_ID", "engaging-reader"),
+    location=os.environ.get("GCP_LOCATION", "us-central1")
 )
 
 # File upload setup
@@ -33,46 +32,35 @@ def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
     return max(files, key=os.path.getmtime) if files else None
 
 def process_image(image_path):
-    """Process image using Gemini AI with your original prompt."""
-    text_prompt = types.Part.from_text(text="""
-    Read the text in this image. Ignore any words in French. Preserve the tables as rich tables. 
-    If there are footnotes in the table make sure to include them under the table. 
-    Write the entire response using markdown format.
-
-    Check your work to make sure you included all of the English language text not in the tables.
-    """)
-
+    """Process image using Gemini AI."""
+    model = genai.GenerativeModel('gemini-pro-vision')
+    
     with open(image_path, "rb") as img_file:
-        img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+        img_data = img_file.read()
 
-    image_part = types.Part.from_bytes(
-        data=base64.b64decode(img_base64),
-        mime_type="image/jpeg",
+    response = model.generate_content(
+        [
+            """Read the text in this image. Ignore any words in French. Preserve the tables as rich tables. 
+            If there are footnotes in the table make sure to include them under the table. 
+            Write the entire response using markdown format.
+
+            Check your work to make sure you included all of the English language text not in the tables.""",
+            img_data
+        ],
+        generation_config=GenerationConfig(
+            temperature=0,
+            top_p=0.95,
+            max_output_tokens=8192,
+        ),
+        safety_settings={
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+        }
     )
-
-    contents = [
-        types.Content(
-            role="user",
-            parts=[text_prompt, image_part]
-        )
-    ]
-
-    config = types.GenerateContentConfig(
-        temperature=0,
-        top_p=0.95,
-        max_output_tokens=8192,
-        response_modalities=["TEXT"],
-    )
-
-    output_text = ""
-    for chunk in client.models.generate_content_stream(
-        model="gemini-1.0-pro-vision",  # Updated model name for compatibility
-        contents=contents,
-        config=config,
-    ):
-        output_text += chunk.text
-
-    return output_text
+    
+    return response.text
 
 @app.route("/")
 def index():
@@ -107,42 +95,33 @@ def get_definition():
         return jsonify({"error": "Word and context are required"}), 400
 
     try:
-        text_prompt = types.Part.from_text(text=f"""input: {word}. {context}
-output:""")
+        model = genai.GenerativeModel('gemini-pro')
         
-        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary...""")  # Keep your original prompt
+        response = model.generate_content(
+            f"""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word you respond in the following format:
 
-        contents = [
-            types.Content(
-                role="user",
-                parts=[text_prompt]
-            )
-        ]
+**Word**
 
-        config = types.GenerateContentConfig(
-            temperature=1,
-            top_p=0.95,
-            max_output_tokens=8192,
-            response_modalities=["TEXT"],
-            safety_settings=[
-                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF")
-            ],
-            system_instruction=[system_instruction],
+Definition and what it means in context of the sentence
+Provide your response in markdown format. Make sure that your responses are accessible for adults with a reading level between grade 4 and 7.
+
+Input: {word}. {context}
+Output:""",
+            generation_config=GenerationConfig(
+                temperature=1,
+                top_p=0.95,
+                max_output_tokens=8192,
+            ),
+            safety_settings={
+                HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_NONE,
+                HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_NONE,
+            }
         )
 
-        output_text = ""
-        for chunk in client.models.generate_content_stream(
-            model="gemini-1.0-pro",  # Updated model name for compatibility
-            contents=contents,
-            config=config,
-        ):
-            output_text += chunk.text
-
         return jsonify({
-            "definition": output_text
+            "definition": response.text
         })
 
     except Exception as e:
