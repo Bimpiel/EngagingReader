@@ -1,23 +1,40 @@
 import os
 import glob
 import base64
+import json
 from flask import Flask, render_template, request, jsonify
 from google import genai
 from google.genai import types
-
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "service_account_file.json"
 
 app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
 
-# Google Gemini Client
-client = genai.Client(
-    vertexai=True,
-    project="engaging-reader",
-    location="us-central1",
-)
+# Initialize Google Gemini Client
+def initialize_genai_client():
+    # Get the JSON string from environment variable
+    service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
+    
+    if not service_account_json:
+        raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON environment variable not set")
+    
+    try:
+        # Write the JSON string to a temporary file
+        with open("temp_service_account.json", "w") as f:
+            f.write(service_account_json)
+        os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "temp_service_account.json"
+    except Exception as e:
+        print(f"Error handling service account: {e}")
+        raise
+    
+    return genai.Client(
+        vertexai=True,
+        project=os.getenv("GOOGLE_PROJECT", "engaging-reader"),
+        location=os.getenv("GOOGLE_LOCATION", "us-central1"),
+    )
+
+client = initialize_genai_client()
 
 def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
     """Fetch the latest uploaded image file from the given directory."""
@@ -78,12 +95,18 @@ def upload_file():
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
     file.save(filepath)
 
-    extracted_markdown = process_image(filepath)
-    
-    return jsonify({
-        "markdown": extracted_markdown,
-        "filename": file.filename
-    })
+    try:
+        extracted_markdown = process_image(filepath)
+        return jsonify({
+            "markdown": extracted_markdown,
+            "filename": file.filename
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        # Clean up the uploaded file
+        if os.path.exists(filepath):
+            os.remove(filepath)
 
 @app.route("/get-definition", methods=["POST"])
 def get_definition():
@@ -95,7 +118,6 @@ def get_definition():
         return jsonify({"error": "Word and context are required"}), 400
 
     try:
-        # Prepare the prompt for Gemini
         text_prompt = types.Part.from_text(text=f"""input: {word}. {context}
 output:""")
 
@@ -128,7 +150,6 @@ for example: Agglomeration. The operating budget of $92.7 million finances (i) l
             system_instruction=[system_instruction],
         )
 
-        # Generate the definition
         output_text = ""
         for chunk in client.models.generate_content_stream(
             model="gemini-2.0-flash-001",
@@ -144,6 +165,7 @@ for example: Agglomeration. The operating budget of $92.7 million finances (i) l
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# Make sure the app binds to the correct interface and port
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=os.environ.get("PORT", 5000))
+    app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
+            host="0.0.0.0",
+            port=int(os.getenv("PORT", "5000")))
