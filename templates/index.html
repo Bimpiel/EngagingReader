@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engaging Reader</title>
+    <link rel="stylesheet" href="static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400;1,700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify/dist/purify.min.js"></script>
+</head>
+
+<body>
+    <h1 class="banner">Engaging Reader</h1>
+
+    <div id="upload-container">
+        <div id="drop-area" class="drop-area">
+            <img src="static/assets/upload.png" alt="Upload Image">
+            <label for="fileInput" class="labBtn">Upload Image</label>
+            <input type="file" id="fileInput" accept="image/*">
+        </div>
+    </div>
+
+    <div id="text-display"></div>
+
+    <div id="loading-overlay" class="loading-overlay">
+        <h1 class="banner">Engaging Reader</h1>
+        <div class="loader2"></div>
+        <label class="labBtn">Loading</label>
+    </div>
+
+    <div id="speech-controls" style="left: 50%;transform: translate(-50%, -50%);">
+        <button id="readBtn" disabled></button>
+        <button id="pauseBtn" disabled></button>
+        <button id="resumeBtn" disabled></button>
+        <button id="stopBtn" disabled></button>
+    </div>
+
+    <!-- Definition Modal -->
+    <div id="definitionModal" class="modal">
+        <div class="modal-content">
+            <h2 id="definitionWord">Definition</h2>
+            <div id="definitionTextContent"></div>
+            <div class="modal-speech-controls">
+                <button id="modalReadBtn"></button>
+                <button id="modalPauseBtn" disabled></button>
+                <button id="modalResumeBtn" disabled></button>
+                <button id="modalStopBtn" disabled></button>
+            </div>
+            
+            <div onclick="closeDefinitionModal()" class="close-btn"><svg onclick="closeDefinitionModal()" xmlns="http://www.w3.org/2000/svg" x="0px" y="0px" width="100" height="100"
+                viewBox="0 0 50 50">
+                <path
+                    d="M25,2C12.319,2,2,12.319,2,25s10.319,23,23,23s23-10.319,23-23S37.681,2,25,2z M33.71,32.29c0.39,0.39,0.39,1.03,0,1.42	C33.51,33.9,33.26,34,33,34s-0.51-0.1-0.71-0.29L25,26.42l-7.29,7.29C17.51,33.9,17.26,34,17,34s-0.51-0.1-0.71-0.29	c-0.39-0.39-0.39-1.03,0-1.42L23.58,25l-7.29-7.29c-0.39-0.39-0.39-1.03,0-1.42c0.39-0.39,1.03-0.39,1.42,0L25,23.58l7.29-7.29	c0.39-0.39,1.03-0.39,1.42,0c0.39,0.39,0.39,1.03,0,1.42L26.42,25L33.71,32.29z">
+                </path>
+            </svg></div>
+        </div>
+    </div>
+
+    <script src="static/javascript.js">
+       
+    </script>
+</body>
+
+</html>
