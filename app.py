@@ -2,13 +2,16 @@ import os
 import glob
 import base64
 import json
+import logging
 from flask import Flask, render_template, request, jsonify
 from google import genai
 from google.genai import types
 
-app = Flask(__name__)
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Create uploads folder if it doesn't exist
+app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -18,13 +21,12 @@ def initialize_genai_client():
     service_account_json = os.getenv("GOOGLE_SERVICE_ACCOUNT_JSON")
     if not service_account_json:
         raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON environment variable not set")
-
     try:
         with open("temp_service_account.json", "w") as f:
             f.write(service_account_json)
         os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "temp_service_account.json"
     except Exception as e:
-        print(f"Error handling service account: {e}")
+        logger.error(f"Error handling service account: {e}")
         raise
 
     return genai.Client(
@@ -35,12 +37,10 @@ def initialize_genai_client():
 
 client = initialize_genai_client()
 
-# Fetch the latest image from uploads folder
 def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
     files = [f for ext in extensions for f in glob.glob(os.path.join(directory, f"*.{ext}"))]
     return max(files, key=os.path.getmtime) if files else None
 
-# Process uploaded image with Gemini AI
 def process_image(image_path):
     text_prompt = types.Part.from_text(text="""Read the text in this image. Ignore any words in French. Preserve the tables as rich tables. If there are footnotes in the table make sure to include them under the table. Write the entire response using markdown format.
 
@@ -78,7 +78,6 @@ Check your work to make sure you included all of the English language text not i
 
     return output_text
 
-# Routes
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -102,6 +101,7 @@ def upload_file():
             "filename": file.filename
         })
     except Exception as e:
+        logger.error(f"Error processing image: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
         if os.path.exists(filepath):
@@ -113,8 +113,8 @@ def get_definition():
     word = data.get("word", "")
     context = data.get("context", "")
 
-    # 👇 Print context to console
-    print(f"Context received: {context}")
+    # Logging the whole sentence clearly
+    logger.info(f"🔍 Full sentence context for '{word}': {context}")
 
     if not word or not context:
         return jsonify({"error": "Word and context are required"}), 400
@@ -129,11 +129,7 @@ output:""")
 
 Definition and what it means in context of the sentence
 Provide your response in markdown format. Make sure that your responses are accessible for adults with a reading level between grade 4 and 7.
-
-Example: 
-Agglomeration. The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit.
-
-Definition: Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.""")
+for example: Agglomeration. The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit is an input and the output would be Definition: Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.""")
 
         contents = [
             types.Content(
@@ -169,12 +165,10 @@ Definition: Agglomeration means a group or collection of things gathered togethe
         })
 
     except Exception as e:
+        logger.error(f"Error generating definition: {str(e)}")
         return jsonify({"error": str(e)}), 500
 
-# Run app
 if __name__ == "__main__":
-    app.run(
-        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
-        host="0.0.0.0",
-        port=int(os.getenv("PORT", "5000"))
-    )
+    app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
+            host="0.0.0.0",
+            port=int(os.getenv("PORT", "5000")))
