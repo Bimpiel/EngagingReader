@@ -334,7 +334,7 @@ function stopReading() {
 
 // Show error message
 function showError(message) {
-    outputDiv.innerHTML = `<div style="color: #d32f2f; padding: 20px; font-size: 24pt;">${message}</div>`;
+    outputDiv.innerHTML = `<div style="color: #d32f2f; margin-top: -110px; font-size: 24pt; line-height: 1.1;">${message}</div>`;
 }
 
 // Handle word selection on double-click

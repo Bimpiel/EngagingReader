@@ -35,7 +35,7 @@ body {
 
 .drop-area {
     display: flex;
-    margin-top: 180px;
+    margin-top: 160px;
     flex-direction: column;
     justify-content: center;
     align-items: center;
@@ -49,6 +49,7 @@ body {
 
 #drop-area img {
     max-width: 100%;
+    max-height: 50vh;
     height: auto;
 }
 #definitionModal svg{
@@ -211,8 +212,10 @@ body {
 }
 
 .loader2 {
-    width: 340px;
+    width: 340px;    
+    max-width: 34vh;
     padding: 40px;
+    margin-top: 60px;
     margin-bottom: 50px;
     aspect-ratio: 1;
     border-radius: 50%;
