@@ -52,11 +52,14 @@ body {
     max-height: 50vh;
     height: auto;
 }
+
 #definitionModal svg{
     margin: 20px;
-        top: 0;
-        right: 0;
-        position: fixed;
+    top: 0;
+    right: 0;
+    width: 60px;
+    height: 60px;
+    position: fixed;
 }
 
 #drop-area label {
@@ -212,8 +215,8 @@ body {
 }
 
 .loader2 {
-    width: 340px;    
-    max-width: 34vh;
+    width: min(340px, 34vh);    
+    height: min(340px, 34vh);    
     padding: 40px;
     margin-top: 60px;
     margin-bottom: 50px;
