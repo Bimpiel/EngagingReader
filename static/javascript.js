@@ -36,18 +36,51 @@ const resumeBtn = document.getElementById("resumeBtn");
 const stopBtn = document.getElementById("stopBtn");
 
 // Initialize voices when they become available
-speechSynthesis.onvoiceschanged = function () {
-    // No voice selection in this design
-};
+function loadVoices() {
+    return new Promise((resolve) => {
+        const voices = speechSynthesis.getVoices();
+        if (voices.length > 0) {
+            resolve(voices);
+        } else {
+            speechSynthesis.onvoiceschanged = function() {
+                const voices = speechSynthesis.getVoices();
+                resolve(voices);
+            };
+        }
+    });
+}
+
+// Get the best English voice available
+async function getEnglishVoice() {
+    const voices = await loadVoices();
+    const preferredVoicesOrder = [
+        'en-US', 'en_GB', 'en-GB', 'en-AU', 'en-CA', 'en-IN',
+        'en-US-male', 'en-US-female', 'en-GB-oxendict'
+    ];
+    
+    // Try to find exact matches first
+    for (const lang of preferredVoicesOrder) {
+        const voice = voices.find(v => v.lang.includes(lang));
+        if (voice) return voice;
+    }
+    
+    // Fallback to any English voice
+    return voices.find(voice => 
+        voice.lang.startsWith('en-') || voice.lang.startsWith('en_')
+    ) || voices[0]; // Fallback to first available voice if no English found
+}
 
 // Initialize the app when DOM is loaded
-document.addEventListener('DOMContentLoaded', function () {
+document.addEventListener('DOMContentLoaded', function() {
+    // Preload voices
+    loadVoices();
+    
     // Hide speech controls initially
     document.getElementById('speech-controls').style.display = 'none';
     
     // Set up event listeners
     document.querySelector('.close-btn').addEventListener('click', closeDefinitionModal);
-    window.addEventListener('click', function (event) {
+    window.addEventListener('click', function(event) {
         if (event.target === definitionModal) {
             closeDefinitionModal();
         }
@@ -211,7 +244,7 @@ function stopAllSpeech() {
 }
 
 // Read the extracted text aloud with highlighting
-function readText() {
+async function readText() {
     if (!currentText) return;
 
     // Stop any ongoing speech
@@ -237,17 +270,20 @@ function readText() {
     // Create utterance
     mainSpeechUtterance = new SpeechSynthesisUtterance(cleanText);
 
-    // Set default voice
-    const voices = speechSynthesis.getVoices();
-    if (voices.length > 0) {
-        mainSpeechUtterance.voice = voices[0];
+    // Get and set English voice
+    const englishVoice = await getEnglishVoice();
+    if (englishVoice) {
+        mainSpeechUtterance.voice = englishVoice;
+        mainSpeechUtterance.lang = englishVoice.lang;
+    } else {
+        mainSpeechUtterance.lang = 'en-US';
     }
 
     // Set default rate
     mainSpeechUtterance.rate = 1;
 
     // Event handlers
-    mainSpeechUtterance.onboundary = function (event) {
+    mainSpeechUtterance.onboundary = function(event) {
         if (event.name === 'word') {
             const charIndex = event.charIndex;
             let currentCharCount = 0;
@@ -264,7 +300,7 @@ function readText() {
         }
     };
 
-    mainSpeechUtterance.onend = function () {
+    mainSpeechUtterance.onend = function() {
         isMainSpeaking = false;
         readBtn.disabled = false;
         pauseBtn.disabled = true;
@@ -274,19 +310,19 @@ function readText() {
         highlightCurrentWord(-1);
     };
 
-    mainSpeechUtterance.onpause = function () {
+    mainSpeechUtterance.onpause = function() {
         mainSpeechPaused = true;
         pauseBtn.disabled = true;
         resumeBtn.disabled = false;
     };
 
-    mainSpeechUtterance.onresume = function () {
+    mainSpeechUtterance.onresume = function() {
         mainSpeechPaused = false;
         pauseBtn.disabled = false;
         resumeBtn.disabled = true;
     };
 
-    mainSpeechUtterance.onerror = function (event) {
+    mainSpeechUtterance.onerror = function(event) {
         // Ignore 'interrupted' errors as they're expected when switching
         if (event.error !== 'interrupted') {
             console.error('Main SpeechSynthesis error:', event);
@@ -426,7 +462,7 @@ async function getDefinition(word, context) {
 }
 
 // Read the definition aloud with highlighting
-function readDefinitionAloud() {
+async function readDefinitionAloud() {
     const definitionText = definitionContent.textContent;
     if (!definitionText) return;
 
@@ -438,17 +474,20 @@ function readDefinitionAloud() {
     // Create utterance
     modalSpeechUtterance = new SpeechSynthesisUtterance(definitionText);
 
-    // Set default voice
-    const voices = speechSynthesis.getVoices();
-    if (voices.length > 0) {
-        modalSpeechUtterance.voice = voices[0];
+    // Get and set English voice
+    const englishVoice = await getEnglishVoice();
+    if (englishVoice) {
+        modalSpeechUtterance.voice = englishVoice;
+        modalSpeechUtterance.lang = englishVoice.lang;
+    } else {
+        modalSpeechUtterance.lang = 'en-US';
     }
 
     // Set default rate
     modalSpeechUtterance.rate = 1;
 
     // Event handlers
-    modalSpeechUtterance.onboundary = function (event) {
+    modalSpeechUtterance.onboundary = function(event) {
         if (event.name === 'word') {
             const charIndex = event.charIndex;
             let currentCharCount = 0;
@@ -465,7 +504,7 @@ function readDefinitionAloud() {
         }
     };
 
-    modalSpeechUtterance.onend = function () {
+    modalSpeechUtterance.onend = function() {
         isModalSpeaking = false;
         modalReadBtn.disabled = false;
         modalPauseBtn.disabled = true;
@@ -475,19 +514,19 @@ function readDefinitionAloud() {
         highlightModalCurrentWord(-1);
     };
 
-    modalSpeechUtterance.onpause = function () {
+    modalSpeechUtterance.onpause = function() {
         modalSpeechPaused = true;
         modalPauseBtn.disabled = true;
         modalResumeBtn.disabled = false;
     };
 
-    modalSpeechUtterance.onresume = function () {
+    modalSpeechUtterance.onresume = function() {
         modalSpeechPaused = false;
         modalPauseBtn.disabled = false;
         modalResumeBtn.disabled = true;
     };
 
-    modalSpeechUtterance.onerror = function (event) {
+    modalSpeechUtterance.onerror = function(event) {
         // Ignore 'interrupted' errors as they're expected when switching
         if (event.error !== 'interrupted') {
             console.error('Modal SpeechSynthesis error:', event);
