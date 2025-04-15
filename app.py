@@ -42,9 +42,20 @@ def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
     return max(files, key=os.path.getmtime) if files else None
 
 def process_image(image_path):
-    text_prompt = types.Part.from_text(text="""Read the text in this image. Ignore any words in French. Preserve the tables as rich tables. If there are footnotes in the table make sure to include them under the table. Write the entire response using markdown format.
+    text_prompt = types.Part.from_text(text="""Read the text in this image. Ignore any words in French. Preserve the tables as rich tables. If there are footnotes in the table make sure to include them under the table. Write the entire response using markdown format. 
 
-Check your work to make sure you included all of the English language text not in the tables.""")
+Check your work to make sure you included all of the English language text not in the tables.
+
+For tables, check your work carefully to ensure the markdown is correct. Pay close attention to the following:
+
+* **Table Formatting:** Ensure proper alignment of columns and rows. Verify that cell borders and spacing are rendered correctly.
+* **Headers:** Double-check that headers (e.g., column headers) are marked up correctly using the appropriate markdown syntax.
+* **Emphasis:** Confirm that bold, italics, and other formatting elements are applied accurately.
+* **Lists:** If there are lists, ensure they are formatted correctly using proper indentation and bullet points or numbering.
+* **Footnotes:** If footnotes are present in the table, verify that they are placed beneath the table and linked correctly using corresponding numbered references. Subscripts should be denoted using the ~ symbol.
+* **Special Characters:** Be mindful of any special characters or symbols and ensure they are displayed correctly in the markdown output. If necessary, use appropriate escape sequences.
+
+Check your work to make sure the text is correct and that you included all of the text including URLs.""")
 
     with open(image_path, "rb") as img_file:
         img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
@@ -135,19 +146,10 @@ Please provide a definition for '{word}' as used in this context, formatted in m
         
         text_prompt = types.Part.from_text(text=user_prompt)
 
-        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. 
-When given a word and its context, provide an accessible and accurate definition based on how the word is used in the given sentence.
-
-Format your response like this:
-
-**Word**  
-Definition and explanation of what it means in this specific context.
-
-Keep these guidelines in mind:
-1. Use simple language (grade 4-7 reading level)
-2. Explain how the word is used in this specific sentence
-3. Format your response in markdown
-4. Make the definition practical and relatable""")
+        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word you respond in the following format
+word definition and what it means in context of the sentence
+Provide your response in markdown format
+Make sure that your responses are accessible for adults with a reading level between grade 4 and 7""")
 
         contents = [
             types.Content(
