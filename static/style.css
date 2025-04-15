@@ -23,6 +23,7 @@ body {
     font-weight: 700;
     font-style: normal;
     z-index: 100;
+    cursor: pointer;
 }
 
 #upload-container {
