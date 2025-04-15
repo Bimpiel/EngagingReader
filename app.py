@@ -109,27 +109,45 @@ def upload_file():
 
 @app.route("/get-definition", methods=["POST"])
 def get_definition():
-    data = request.get_json()
-    word = data.get("word", "")
-    context = data.get("context", "")
-
-    # Logging the whole sentence clearly
-    logger.info(f"🔍 Full sentence context for '{word}': {context}")
-
-    if not word or not context:
-        return jsonify({"error": "Word and context are required"}), 400
-
     try:
-        text_prompt = types.Part.from_text(text=f"""input: {word}. {context}
-output:""")
+        data = request.get_json()
+        logger.info(f"Received data: {data}")  # Log the incoming data
+        
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
 
-        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word you respond in the following format:
+        word = data.get("word", "").strip()
+        context = data.get("context", "").strip()
 
-**Word**
+        # Validate input
+        if not word:
+            return jsonify({"error": "Word is required"}), 400
+        if not context:
+            return jsonify({"error": "Context is required"}), 400
 
-Definition and what it means in context of the sentence
-Provide your response in markdown format. Make sure that your responses are accessible for adults with a reading level between grade 4 and 7.
-for example: Agglomeration. The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit is an input and the output would be Definition: Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.""")
+        logger.info(f"Processing definition for word: '{word}' with context: '{context}'")
+
+        # Create a clear prompt that combines both word and context
+        user_prompt = f"""Word to define: {word}
+Full sentence context: {context}
+
+Please provide a definition for '{word}' as used in this context, formatted in markdown for easy reading."""
+        
+        text_prompt = types.Part.from_text(text=user_prompt)
+
+        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. 
+When given a word and its context, provide an accessible and accurate definition based on how the word is used in the given sentence.
+
+Format your response like this:
+
+**Word**  
+Definition and explanation of what it means in this specific context.
+
+Keep these guidelines in mind:
+1. Use simple language (grade 4-7 reading level)
+2. Explain how the word is used in this specific sentence
+3. Format your response in markdown
+4. Make the definition practical and relatable""")
 
         contents = [
             types.Content(
@@ -139,15 +157,15 @@ for example: Agglomeration. The operating budget of $92.7 million finances (i) l
         ]
 
         config = types.GenerateContentConfig(
-            temperature=1,
+            temperature=0.7,  # Slightly creative but mostly factual
             top_p=0.95,
             max_output_tokens=8192,
             response_modalities=["TEXT"],
             safety_settings=[
-                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="OFF"),
-                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="OFF")
+                types.SafetySetting(category="HARM_CATEGORY_HATE_SPEECH", threshold="BLOCK_LOW_AND_ABOVE"),
+                types.SafetySetting(category="HARM_CATEGORY_DANGEROUS_CONTENT", threshold="BLOCK_LOW_AND_ABOVE"),
+                types.SafetySetting(category="HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold="BLOCK_LOW_AND_ABOVE"),
+                types.SafetySetting(category="HARM_CATEGORY_HARASSMENT", threshold="BLOCK_LOW_AND_ABOVE")
             ],
             system_instruction=[system_instruction],
         )
@@ -160,13 +178,14 @@ for example: Agglomeration. The operating budget of $92.7 million finances (i) l
         ):
             output_text += chunk.text
 
+        logger.info(f"Generated definition: {output_text}")
         return jsonify({
             "definition": output_text
         })
 
     except Exception as e:
-        logger.error(f"Error generating definition: {str(e)}")
-        return jsonify({"error": str(e)}), 500
+        logger.error(f"Error in get_definition: {str(e)}", exc_info=True)
+        return jsonify({"error": "An error occurred while processing your request"}), 500
 
 if __name__ == "__main__":
     app.run(debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",
