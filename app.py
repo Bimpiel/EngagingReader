@@ -149,7 +149,9 @@ Please provide a definition for '{word}' as used in this context, formatted in m
         system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word you respond in the following format
 word definition and what it means in context of the sentence
 Provide your response in markdown format
-Make sure that your responses are accessible for adults with a reading level between grade 4 and 7""")
+Make sure that your responses are accessible for adults with a reading level between grade 4 and 7
+                                                  example input:Agglomeration. The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit
+                                                  example output Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.""")
 
         contents = [
             types.Content(
