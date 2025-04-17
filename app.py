@@ -139,7 +139,7 @@ def get_definition():
         logger.info(f"Processing definition for word: '{word}' with context: '{context}'")
 
         # Create a clear prompt that combines both word and context
-                user_prompt = f"""{word}. {context}"""
+        user_prompt = f"""{word}. {context}"""
         
         text_prompt = types.Part.from_text(text=user_prompt)
 
