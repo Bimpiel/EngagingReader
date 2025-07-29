@@ -57,9 +57,36 @@ def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
 # === Core Function: Process Uploaded Image and Extract Markdown ===
 def process_image(image_path):
     # Create a prompt to guide Gemini on how to extract the data
-    text_prompt = types.Part.from_text(text="""Read the text in this image. Ignore any words in French...
-    [Extensive formatting and instruction text omitted here for brevity]
-    """)
+    text_prompt = types.Part.from_text(text="""**Act as an expert document intelligence agent.** Your mission is to analyze the image, process its content based on the rules below, and generate a clean, well-structured Markdown document.
+
+---
+
+### **Step 1: Language Processing Rule**
+
+First, estimate the language distribution in the image and follow the corresponding instruction:
+
+* **Scenario A: The document contains a significant amount of English text (i.e., English makes up more than 10% of the content).**
+    * **Action:** Extract **only the English content.** Completely ignore and discard all non-English text.
+
+* **Scenario B: The document is overwhelmingly non-English (i.e., 90% or more of the text is in a non-English language).**
+    * **Action:** Translate the **entire document** into English. Any isolated English words should be kept and included in their logical place within the final translated output.
+
+---
+
+### **Step 2: Formatting Instructions**
+
+After processing the language according to the rule above, format the entire output using these guidelines:
+
+* **Markdown Output:** The entire response must be in Markdown. This includes all text, headings, tables, and lists.
+* **Tables:**
+    * Recreate all tables as proper Markdown tables.
+    * If you are following **Scenario A**, ensure the tables are built using **only the English headers and data columns.**
+    * Preserve original emphasis like **bold** and *italics*.
+* **Footnotes:**
+    * If a table has footnotes, place the full footnote text immediately below its corresponding table.
+    * In the table cell, mark the reference number with a tilde, like this: `1,234,567~1~`.
+    * Begin the footnote text itself with the same marker, like this: `~1~ This is the footnote text.`
+* **Completeness:** Ensure all extracted (or translated) text, including any URLs, is present in the final output.""")
 
     # Open the image, encode it in base64, and decode it back to binary
     with open(image_path, "rb") as img_file:
@@ -89,7 +116,7 @@ def process_image(image_path):
     # Stream response from Gemini and concatenate result
     output_text = ""
     for chunk in client.models.generate_content_stream(
-        model="gemini-2.0-flash-001",
+        model="gemini-2.5-flash",
         contents=contents,
         config=config,
     ):
