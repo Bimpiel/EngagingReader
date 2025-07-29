@@ -169,6 +169,7 @@ async function uploadImage() {
 
         // Enable read button and store the current text
         currentText = cleanHtml;
+        console.log('📄 currentText set during upload, length:', cleanHtml.length);
         readBtn.disabled = false;
 
         // Show speech controls after successful processing
@@ -186,22 +187,49 @@ async function uploadImage() {
     }
 }
 
-// Prepare text for reading by extracting content and splitting into words
-function prepareTextForReading(text) {
-    // Create a temporary div to extract text content from HTML
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = text;
+/**
+ * Recursively finds text nodes within an element and wraps each word in a <span>.
+ * @param {Node} node - The DOM node to process.
+ */
+function wrapWordsInSpans(node) {
+    // Ignore nodes that aren't elements or text
+    if (node.nodeType !== Node.ELEMENT_NODE && node.nodeType !== Node.TEXT_NODE) {
+        return;
+    }
 
-    // Remove any existing spans or highlights
-    const existingSpans = tempDiv.querySelectorAll('span.highlight-word');
-    existingSpans.forEach(span => {
-        span.outerHTML = span.innerHTML;
-    });
+    // If it's a text node, wrap its words
+    if (node.nodeType === Node.TEXT_NODE) {
+        // Don't wrap empty/whitespace-only text nodes
+        if (node.textContent.trim() === '') {
+            return;
+        }
 
-    // Get the clean text
-    const cleanText = tempDiv.textContent || tempDiv.innerText || "";
+        const fragment = document.createDocumentFragment();
+        const words = node.textContent.split(/\s+/); // Split by whitespace
 
-    return cleanText;
+        words.forEach((word, index) => {
+            if (word) {
+                const span = document.createElement('span');
+                span.className = 'word highlight-word';
+                span.textContent = word;
+                fragment.appendChild(span);
+            }
+            
+            // Add a space back between words
+            if (index < words.length - 1) {
+                fragment.appendChild(document.createTextNode(' '));
+            }
+        });
+
+        // Replace the original text node with the new fragment containing spans
+        node.parentNode.replaceChild(fragment, node);
+        return;
+    }
+
+    // If it's an element, recursively call this function on its children
+    // We convert childNodes to an array because the collection is live and will be modified
+    const children = Array.from(node.childNodes);
+    children.forEach(child => wrapWordsInSpans(child));
 }
 
 // Highlight the current word being spoken in main content
@@ -245,25 +273,32 @@ function stopAllSpeech() {
 
 // Read the extracted text aloud with highlighting
 async function readText() {
-    if (!currentText) return;
+    console.log('🎵 readText called!');
+    console.log('📝 currentText:', currentText ? 'HAS CONTENT' : 'EMPTY/NULL');
+    console.log('🔘 readBtn disabled?', readBtn.disabled);
+    
+    if (!currentText) {
+        console.log('❌ No currentText - returning early');
+        return;
+    }
 
     // Stop any ongoing speech
     stopAllSpeech();
     mainCurrentWordIndex = 0;
     isMainSpeaking = true;
 
-    // Prepare the text
-    const cleanText = prepareTextForReading(currentText);
+    // 1. Get the plain text for the speech synthesis engine BEFORE modifying the DOM
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = currentText;
+    const cleanText = tempDiv.textContent;
 
-    // Create word spans for highlighting
-    outputDiv.innerHTML = cleanText.split('\n').map(paragraph => {
-        if (paragraph.trim() === '') return '<div class="word-line"><br></div>';
-        return `<div class="word-line">${paragraph.split(' ').map(word =>
-            `<span class="word highlight-word">${word}</span>`
-        ).join(' ')}</div>`;
-    }).join('');
+    // 2. Reset the display to its original formatted state
+    outputDiv.innerHTML = currentText;
+    
+    // 3. Traverse and wrap words without destroying the structure
+    wrapWordsInSpans(outputDiv);
 
-    // Get all word spans
+    // 4. Get all word spans for highlighting
     mainWordSpans = Array.from(document.querySelectorAll('.highlight-word'));
     mainWords = mainWordSpans.map(span => span.textContent);
 
@@ -338,7 +373,11 @@ async function readText() {
     stopBtn.disabled = false;
 
     // Start speaking
+    console.log('🗣️ About to call speechSynthesis.speak()');
+    console.log('📊 cleanText length:', cleanText.length);
+    console.log('🔢 Word spans found:', mainWordSpans.length);
     speechSynthesis.speak(mainSpeechUtterance);
+    console.log('✅ speechSynthesis.speak() called!');
 }
 
 // Pause the main reading
@@ -380,10 +419,26 @@ function handleWordSelection(event) {
     const selectedText = selection.toString().trim();
 
     if (selectedText && selectedText.split(' ').length === 1) {
-        // Get the surrounding text (context)
+        // Get better surrounding text (context)
         const range = selection.getRangeAt(0);
-        const container = range.commonAncestorContainer;
-        let context = container.textContent || container.innerText;
+        
+        // Find the closest paragraph or container element
+        let contextElement = range.commonAncestorContainer;
+        if (contextElement.nodeType === Node.TEXT_NODE) {
+            contextElement = contextElement.parentElement;
+        }
+        
+        // Look for a meaningful container (paragraph, div, etc.)
+        while (contextElement && 
+               contextElement !== outputDiv && 
+               !['P', 'DIV', 'SECTION', 'ARTICLE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(contextElement.tagName)) {
+            contextElement = contextElement.parentElement;
+        }
+        
+        // Get context from the meaningful container, fallback to full text
+        let context = contextElement ? 
+            (contextElement.textContent || contextElement.innerText) : 
+            (outputDiv.textContent || outputDiv.innerText);
 
         // Limit context to a reasonable length
         context = context.substring(0, 500);
