@@ -185,10 +185,10 @@ def get_definition():
         text_prompt = types.Part.from_text(text=user_prompt)
 
         # Define system behavior for this task
-        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word provided, please return the word definition and what it means based on the context provided. If the context has no words, give an example in which it may be used. Choose only one word to define.
-    example input: Word: Agglomeration. Context: The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit
+        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word provided, please return the word definition and what it means based on the context provided. If the context has no words, give an example in which it may be used.
+    example input: 'word': 'Agglomeration'. 'Context': The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit
     example output: Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.
-    Example Input: Word: Depreciation. Context: 
+    Example Input: 'word': 'Depreciation'. 'Context': 
     Example Output: Depreciation means when something loses value over time because it gets old or used. Think of a car - when it’s brand new it’s worth a lot, but as you drive it and it gets older, it’s worth less money. NC""")
 
         # Build the request content
@@ -221,7 +221,8 @@ def get_definition():
             contents=contents,
             config=config,
         ):
-            output_text += chunk.text
+            if chunk.text:  # Only add text if it's not None
+                output_text += chunk.text
 
         logger.info(f"Generated definition: {output_text}")
         return jsonify({"definition": output_text})
