@@ -499,8 +499,8 @@ async function getDefinition(word, context) {
                 'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                word: word,
-                context: context
+                "word to define": word,
+                "context sentence": context
             })
         });
 

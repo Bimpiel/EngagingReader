@@ -57,36 +57,42 @@ def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
 # === Core Function: Process Uploaded Image and Extract Markdown ===
 def process_image(image_path):
     # Create a prompt to guide Gemini on how to extract the data
-    text_prompt = types.Part.from_text(text="""**Act as an expert document intelligence agent.** Your mission is to analyze the image, process its content based on the rules below, and generate a clean, well-structured Markdown document.
+    text_prompt = types.Part.from_text(text="""Act as an expert document intelligence agent. Your mission is to analyze the image, process its content based on the rules below, and generate a clean, well-structured Markdown document.
 
----
-
-### **Step 1: Language Processing Rule**
+Step 1: Language Processing Rule
 
 First, estimate the language distribution in the image and follow the corresponding instruction:
 
-* **Scenario A: The document contains a significant amount of English text (i.e., English makes up more than 10% of the content).**
-    * **Action:** Extract **only the English content.** Completely ignore and discard all non-English text.
+Scenario A: The document contains a significant amount of English text (i.e., English makes up more than 10% of the content).
 
-* **Scenario B: The document is overwhelmingly non-English (i.e., 90% or more of the text is in a non-English language).**
-    * **Action:** Translate the **entire document** into English. Any isolated English words should be kept and included in their logical place within the final translated output.
+Action: Extract only the English content. Completely ignore and discard all non-English text.
 
----
+Scenario B: The document is overwhelmingly non-English (i.e., 90% or more of the text is in a non-English language).
 
-### **Step 2: Formatting Instructions**
+Action: Translate the entire document into English. Any isolated English words should be kept and included in their logical place within the final translated output.
+
+Step 2: Output Rule
+
+Do not include any introductory text, explanations, or preambles in your response. Begin the response directly with the extracted or translated content.
+
+Step 3: Formatting Instructions
 
 After processing the language according to the rule above, format the entire output using these guidelines:
 
-* **Markdown Output:** The entire response must be in Markdown. This includes all text, headings, tables, and lists.
-* **Tables:**
-    * Recreate all tables as proper Markdown tables.
-    * If you are following **Scenario A**, ensure the tables are built using **only the English headers and data columns.**
-    * Preserve original emphasis like **bold** and *italics*.
-* **Footnotes:**
-    * If a table has footnotes, place the full footnote text immediately below its corresponding table.
-    * In the table cell, mark the reference number with a tilde, like this: `1,234,567~1~`.
-    * Begin the footnote text itself with the same marker, like this: `~1~ This is the footnote text.`
-* **Completeness:** Ensure all extracted (or translated) text, including any URLs, is present in the final output.""")
+Markdown Output: The entire response must be in Markdown. This includes all text, headings, tables, and lists.
+
+Tables:
+-- Recreate all tables as proper Markdown tables.
+-- If you are following Scenario A, ensure the tables are built using only the English headers and data columns.
+
+Preserve original emphasis like bold and italics. Preserve paragraphs.
+
+Footnotes:
+-- If a table has footnotes, place the full footnote text immediately below its corresponding table.
+-- In the table cell, mark the reference number with a tilde, like this: 1,234,567~1~.
+-- Begin the footnote text itself with the same marker, like this: ~1~ This is the footnote text.
+
+Completeness: Ensure all extracted (or translated) text, including any URLs, is present in the final output.""")
 
     # Open the image, encode it in base64, and decode it back to binary
     with open(image_path, "rb") as img_file:
@@ -170,26 +176,72 @@ def get_definition():
         if not data:
             return jsonify({"error": "No data provided"}), 400
 
-        word = data.get("word", "").strip()
-        context = data.get("context", "").strip()
+        word = data.get("word to define", "").strip()
+        context = data.get("context sentence", "").strip()
 
         if not word:
-            return jsonify({"error": "Word is required"}), 400
+            return jsonify({"error": "Word to define is required"}), 400
         if not context:
-            return jsonify({"error": "Context is required"}), 400
+            return jsonify({"error": "Context sentence is required"}), 400
 
         logger.info(f"Processing definition for word: '{word}' with context: '{context}'")
 
         # Compose user input into a single message
-        user_prompt = f"""{word}. {context}"""
+        user_prompt = f"""WORD TO DEFINE:
+{word}
+CONTEXT SENTENCE:
+{context}"""
         text_prompt = types.Part.from_text(text=user_prompt)
 
         # Define system behavior for this task
-        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults with low literacy and learning disabilities. Users will provide you first with a word and then the sentence that it takes place in and you will need to provide them with an accessible and accurate definition based on the context. For each word provided, please return the word definition and what it means based on the context provided. If the context has no words, give an example in which it may be used.
-    example input: 'word': 'Agglomeration'. 'Context': The operating budget of $92.7 million finances (i) local services such as library, parks and recreation, Emergency Medical Services, snow clearing, waste management and road maintenance and (ii) its portion of island-wide Agglomeration services such as police, fire and public transit
-    example output: Agglomeration means a group or collection of things gathered together. In this sentence, it refers to services that are shared across the whole island, like police, fire services, and public transportation. These services are provided to everyone on the island, not just one specific town or area.
-    Example Input: 'word': 'Depreciation'. 'Context': 
-    Example Output: Depreciation means when something loses value over time because it gets old or used. Think of a car - when it’s brand new it’s worth a lot, but as you drive it and it gets older, it’s worth less money. NC""")
+        system_instruction = types.Part.from_text(text="""You are an expert at communicating and teaching vocabulary to adults in a simple and encouraging way.
+
+**Instructions:**
+1.  Your primary task is to define the word provided in the "WORD TO DEFINE" field. You must only define this word.
+2.  Use the "CONTEXT SENTENCE" field only to understand the word's meaning. Do not define other words from the context.
+3.  Write at a 4th-7th grade reading level. Keep sentences short and use everyday language.
+4.  If the word is a common grammatical word (like 'with', 'the', 'a', 'is', 'of'), explain the job it does in the sentence instead of giving a dictionary definition.
+5.  For all other words, first give a simple, one-sentence definition. Then, explain its meaning using the context. If no context is given, provide a simple, adult-oriented example sentence.
+
+**Examples:**
+
+---
+**Input:**
+WORD TO DEFINE:
+Liable
+CONTEXT SENTENCE:
+The tenant is liable for any damage caused to the property.
+
+**Output:**
+Liable means you are legally responsible for something. In this sentence, it means the person renting the apartment must pay for anything they break.
+---
+**Input:**
+WORD TO DEFINE:
+with
+CONTEXT SENTENCE:
+They arrived with shouts.
+
+**Output:**
+'With' is a word that connects things together. In this sentence, its job is to show that the people ('they') and the 'shouts' arrived at the same time.
+---
+**Input:**
+WORD TO DEFINE:
+Mandatory
+CONTEXT SENTENCE:
+
+**Output:**
+Mandatory means something is required and you have to do it; it is not a choice. For example, it is mandatory to have a driver's license to drive a car.
+---
+**Input:**
+WORD TO DEFINE:
+Accrue
+CONTEXT SENTENCE:
+The interest on your savings account will accrue monthly.
+
+**Output:**
+Accrue means to build up or be added over time. In this context, it means the extra money from interest is added to your savings account each month, helping it grow.
+---
+""")
 
         # Build the request content
         contents = [
@@ -201,7 +253,7 @@ def get_definition():
 
         # Configure generation settings
         config = types.GenerateContentConfig(
-            temperature=0.7,  # Allows more natural explanations
+            temperature=0.2,  # Allows more natural explanations
             top_p=0.95,
             max_output_tokens=8192,
             response_modalities=["TEXT"],
@@ -217,7 +269,7 @@ def get_definition():
         # Call Gemini and stream the result
         output_text = ""
         for chunk in client.models.generate_content_stream(
-            model="gemini-2.0-flash-001",
+            model="gemini-2.5-flash-lite",
             contents=contents,
             config=config,
         ):
