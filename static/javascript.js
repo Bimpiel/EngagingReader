@@ -29,6 +29,10 @@ let modalCurrentWordIndex = 0;
 let modalSpeechPaused = false;
 let isModalSpeaking = false;
 
+// Track the word that was clicked for definition
+let definedWordElement = null;
+let definedWordIndex = -1;
+
 // Speech control buttons
 const readBtn = document.getElementById("readBtn");
 const pauseBtn = document.getElementById("pauseBtn");
@@ -86,8 +90,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
-    // Add double-click event listener to output div for word selection
-    outputDiv.addEventListener('dblclick', handleWordSelection);
+    // Add single-click event listener to output div for word selection
+    outputDiv.addEventListener('click', handleWordSelection);
 
     // Add event listeners for modal TTS
     modalReadBtn.addEventListener('click', readDefinitionAloud);
@@ -166,6 +170,9 @@ async function uploadImage() {
         const cleanHtml = DOMPurify.sanitize(dirtyHtml);
 
         outputDiv.innerHTML = cleanHtml;
+
+        // Immediately wrap words in spans for clickable definitions
+        wrapWordsInSpans(outputDiv);
 
         // Enable read button and store the current text
         currentText = cleanHtml;
@@ -265,10 +272,11 @@ function highlightModalCurrentWord(index) {
 // Stop all speech synthesis
 function stopAllSpeech() {
     if (speechSynthesis.speaking || speechSynthesis.paused) {
+        console.log('🛑 Stopping all speech synthesis');
         speechSynthesis.cancel();
     }
-    isMainSpeaking = false;
-    isModalSpeaking = false;
+    // Don't immediately reset speaking states as the error handlers might need them
+    // Let the individual functions handle their own state management
 }
 
 // Read the extracted text aloud with highlighting
@@ -286,19 +294,17 @@ async function readText() {
     stopAllSpeech();
     mainCurrentWordIndex = 0;
     isMainSpeaking = true;
+    
+    // Reset defined word tracking since we're starting fresh
+    definedWordElement = null;
+    definedWordIndex = -1;
 
     // 1. Get the plain text for the speech synthesis engine BEFORE modifying the DOM
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = currentText;
     const cleanText = tempDiv.textContent;
 
-    // 2. Reset the display to its original formatted state
-    outputDiv.innerHTML = currentText;
-    
-    // 3. Traverse and wrap words without destroying the structure
-    wrapWordsInSpans(outputDiv);
-
-    // 4. Get all word spans for highlighting
+    // 2. Get all word spans for highlighting (words are already wrapped)
     mainWordSpans = Array.from(document.querySelectorAll('.highlight-word'));
     mainWords = mainWordSpans.map(span => span.textContent);
 
@@ -358,12 +364,14 @@ async function readText() {
     };
 
     mainSpeechUtterance.onerror = function(event) {
-        // Ignore 'interrupted' errors as they're expected when switching
-        if (event.error !== 'interrupted') {
+        // Ignore 'interrupted' and 'canceled' errors as they're expected when switching/resuming
+        if (event.error !== 'interrupted' && event.error !== 'canceled') {
             console.error('Main SpeechSynthesis error:', event);
+            isMainSpeaking = false;
+            stopReading();
+        } else {
+            console.log('🔇 Speech cancelled/interrupted (expected):', event.error);
         }
-        isMainSpeaking = false;
-        stopReading();
     };
 
     // Enable/disable buttons
@@ -389,7 +397,12 @@ function pauseReading() {
 
 // Resume paused main reading
 function resumeReading() {
-    if (mainSpeechUtterance && mainSpeechPaused) {
+    // If we have a defined word to resume from, use smart resume
+    if (definedWordIndex >= 0 && mainWords && mainWords.length > 0) {
+        console.log('📍 Using smart resume from defined word:', mainWords[definedWordIndex]);
+        resumeFromDefinedWord();
+    } else if (mainSpeechUtterance && mainSpeechPaused) {
+        console.log('▶️ Using regular resume');
         speechSynthesis.resume();
     }
 }
@@ -405,6 +418,127 @@ function stopReading() {
     resumeBtn.disabled = true;
     stopBtn.disabled = true;
     highlightCurrentWord(-1);
+    
+    // Reset defined word tracking
+    definedWordElement = null;
+    definedWordIndex = -1;
+}
+
+// Resume reading from the defined word
+async function resumeFromDefinedWord() {
+    console.log('🔄 resumeFromDefinedWord called');
+    console.log('📍 definedWordIndex:', definedWordIndex);
+    console.log('📝 mainWords:', mainWords ? mainWords.slice(Math.max(0, definedWordIndex-2), definedWordIndex+3) : 'null');
+    
+    if (definedWordIndex < 0 || !mainWords || !mainWordSpans) {
+        console.log('❌ Cannot resume from defined word - invalid index or missing data');
+        return;
+    }
+
+    // Only cancel speech if it's actually speaking, not if it's just paused
+    if (speechSynthesis.speaking && !speechSynthesis.paused) {
+        console.log('🛑 Canceling active speech');
+        speechSynthesis.cancel();
+    } else if (speechSynthesis.paused) {
+        console.log('⏸️ Speech is paused, canceling it');
+        speechSynthesis.cancel();
+    }
+    
+    // Set the current word index to the defined word
+    mainCurrentWordIndex = definedWordIndex;
+    isMainSpeaking = true;
+    mainSpeechPaused = false;
+
+    // Create text starting from the defined word
+    const remainingWords = mainWords.slice(definedWordIndex);
+    const textToSpeak = remainingWords.join(' ');
+    
+    console.log('🗣️ Text to speak (first 50 chars):', textToSpeak.substring(0, 50) + '...');
+    console.log('📊 Remaining words count:', remainingWords.length);
+
+    // Create new utterance for the remaining text
+    mainSpeechUtterance = new SpeechSynthesisUtterance(textToSpeak);
+
+    // Get and set English voice
+    const englishVoice = await getEnglishVoice();
+    if (englishVoice) {
+        mainSpeechUtterance.voice = englishVoice;
+        mainSpeechUtterance.lang = englishVoice.lang;
+    } else {
+        mainSpeechUtterance.lang = 'en-US';
+    }
+
+    // Set default rate
+    mainSpeechUtterance.rate = 1;
+
+    // Event handlers
+    mainSpeechUtterance.onboundary = function(event) {
+        if (event.name === 'word') {
+            const charIndex = event.charIndex;
+            let currentCharCount = 0;
+
+            // Find which word we're at based on character index (relative to remaining words)
+            for (let i = 0; i < remainingWords.length; i++) {
+                currentCharCount += remainingWords[i].length + (i === remainingWords.length - 1 ? 0 : 1);
+                if (currentCharCount > charIndex) {
+                    mainCurrentWordIndex = definedWordIndex + i;
+                    highlightCurrentWord(mainCurrentWordIndex);
+                    break;
+                }
+            }
+        }
+    };
+
+    mainSpeechUtterance.onend = function() {
+        isMainSpeaking = false;
+        readBtn.disabled = false;
+        pauseBtn.disabled = true;
+        resumeBtn.disabled = true;
+        stopBtn.disabled = true;
+        mainCurrentWordIndex = 0;
+        highlightCurrentWord(-1);
+    };
+
+    mainSpeechUtterance.onpause = function() {
+        mainSpeechPaused = true;
+        pauseBtn.disabled = true;
+        resumeBtn.disabled = false;
+    };
+
+    mainSpeechUtterance.onresume = function() {
+        mainSpeechPaused = false;
+        pauseBtn.disabled = false;
+        resumeBtn.disabled = true;
+    };
+
+    mainSpeechUtterance.onerror = function(event) {
+        // Ignore 'interrupted' and 'canceled' errors as they're expected when switching/resuming
+        if (event.error !== 'interrupted' && event.error !== 'canceled') {
+            console.error('Main SpeechSynthesis error:', event);
+            isMainSpeaking = false;
+            stopReading();
+        } else {
+            console.log('🔇 Speech cancelled/interrupted (expected):', event.error);
+        }
+    };
+
+    // Highlight the starting word
+    highlightCurrentWord(definedWordIndex);
+
+    // Enable/disable buttons
+    readBtn.disabled = true;
+    pauseBtn.disabled = false;
+    resumeBtn.disabled = true;
+    stopBtn.disabled = false;
+
+    // Start speaking from the defined word
+    console.log(`🗣️ Resuming reading from word "${mainWords[definedWordIndex]}" at index ${definedWordIndex}`);
+    
+    // Small delay to ensure previous speech is completely cancelled
+    setTimeout(() => {
+        speechSynthesis.speak(mainSpeechUtterance);
+        console.log('✅ New utterance started');
+    }, 100);
 }
 
 // Show error message
@@ -412,23 +546,60 @@ function showError(message) {
     outputDiv.innerHTML = `<div style="color: #d32f2f; margin-top: -110px; font-size: 24pt; line-height: 1.1;">${message}</div>`;
 }
 
-// Handle word selection on double-click
+// Handle word selection on click
 function handleWordSelection(event) {
-    // Get the selected text
-    const selection = window.getSelection();
-    const selectedText = selection.toString().trim();
+    let selectedText = '';
+    let contextElement = null;
 
-    if (selectedText && selectedText.split(' ').length === 1) {
-        // Get better surrounding text (context)
+    // First, check if text is already selected
+    const selection = window.getSelection();
+    const selectionText = selection.toString().trim();
+
+    if (selectionText && selectionText.split(' ').length === 1) {
+        // Use the selected text
+        selectedText = selectionText;
         const range = selection.getRangeAt(0);
-        
-        // Find the closest paragraph or container element
-        let contextElement = range.commonAncestorContainer;
+        contextElement = range.commonAncestorContainer;
         if (contextElement.nodeType === Node.TEXT_NODE) {
             contextElement = contextElement.parentElement;
         }
+    } else {
+        // If no text selected, get the word that was clicked
+        let target = event.target;
         
-        // Look for a meaningful container (paragraph, div, etc.)
+        // Check if clicked element is a word span
+        if (target.classList && target.classList.contains('word')) {
+            selectedText = target.textContent.trim();
+            contextElement = target;
+            
+            // Store the clicked word element for resuming reading later
+            definedWordElement = target;
+            
+            // Find the index of this word in the main word spans array
+            if (mainWordSpans && mainWordSpans.length > 0) {
+                definedWordIndex = mainWordSpans.indexOf(target);
+                console.log('🎯 Word clicked:', selectedText);
+                console.log('📍 Word index found:', definedWordIndex);
+                console.log('📊 Total words:', mainWordSpans.length);
+            } else {
+                console.log('⚠️ mainWordSpans not available, cannot track word index');
+                definedWordIndex = -1;
+            }
+        } else {
+            // If clicked on text node, try to extract the word
+            if (target.nodeType === Node.TEXT_NODE) {
+                target = target.parentElement;
+            }
+            
+            // If we can't identify a specific word span, don't show modal
+            // This prevents accidental triggers on empty spaces or unwrapped text
+            return;
+        }
+    }
+
+    // Only proceed if we have a single word
+    if (selectedText && selectedText.split(' ').length === 1) {
+        // Find the closest meaningful container for context
         while (contextElement && 
                contextElement !== outputDiv && 
                !['P', 'DIV', 'SECTION', 'ARTICLE', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6'].includes(contextElement.tagName)) {
@@ -442,6 +613,15 @@ function handleWordSelection(event) {
 
         // Limit context to a reasonable length
         context = context.substring(0, 500);
+
+        // Pause main reading when user clicks a word
+        if (isMainSpeaking) {
+            pauseReading();
+        } else {
+            // If reading wasn't active, don't try to resume later
+            definedWordElement = null;
+            definedWordIndex = -1;
+        }
 
         // Show loading state
         showDefinitionModal(selectedText, "Loading definition...");
@@ -488,6 +668,21 @@ function showDefinitionModal(word, content) {
 function closeDefinitionModal() {
     stopDefinitionReading();
     definitionModal.style.display = 'none';
+    
+    // Debug logging
+    console.log('🔍 Modal closed - checking resume conditions:');
+    console.log('📊 mainSpeechPaused:', mainSpeechPaused);
+    console.log('📍 definedWordIndex:', definedWordIndex);
+    console.log('🎤 mainSpeechUtterance exists:', !!mainSpeechUtterance);
+    console.log('📝 mainWords length:', mainWords ? mainWords.length : 'null');
+    
+    // Resume reading from the defined word if main reading was active
+    if (mainSpeechPaused && definedWordIndex >= 0 && mainWords && mainWords.length > 0) {
+        console.log('✅ Conditions met - resuming from word:', mainWords[definedWordIndex]);
+        resumeFromDefinedWord();
+    } else {
+        console.log('❌ Resume conditions not met');
+    }
 }
 
 // Get definition from Google AI
