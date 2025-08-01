@@ -83,10 +83,10 @@ body {
 }
 
 #text-display {
-    margin-top: clamp(5rem, 15vw, 8rem);
+    margin-top: clamp(2rem, 6vw, 5rem);
     line-height: 1.6;
-    margin-bottom: clamp(2rem, 5vw, 3rem);
-    font-size: clamp(1.2rem, 4vw, 2.5rem); /* Responsive font size */
+    margin-bottom: clamp(2rem, 6vw, 5rem);
+    font-size: clamp(1.2rem, 5vw, 3rem); /* Responsive font size */
     padding: clamp(1rem, 3vw, 2rem);
     max-width: 100%;
     word-wrap: break-word;
@@ -98,11 +98,16 @@ body {
     font-size: inherit; /* Use parent's responsive font size */
     padding: 2px 1px; /* Small padding for better clickability */
     border-radius: 3px;
-    transition: background-color 0.2s ease;
+    /* Removed transition for instant highlighting changes */
+    
+    /* Reserve space to prevent reflow when bolded */
+    letter-spacing: 0.5px; /* Slightly wider spacing to accommodate bold width */
+    white-space: nowrap; /* Prevent individual words from wrapping */
 }
 
 .word:hover {
     background-color: rgba(149, 211, 166, 0.3); /* Light green hover effect */
+    transition: background-color 0.2s ease; /* Smooth transition only on hover */
 }
 
 .word-line {
