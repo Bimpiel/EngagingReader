@@ -33,6 +33,9 @@ let isModalSpeaking = false;
 let definedWordElement = null;
 let definedWordIndex = -1;
 
+// Track if pause was manual (pause button) vs automatic (definition)
+let isManuallyPaused = false;
+
 // Speech control buttons
 const readBtn = document.getElementById("readBtn");
 const pauseBtn = document.getElementById("pauseBtn");
@@ -298,6 +301,7 @@ async function readText() {
     // Reset defined word tracking since we're starting fresh
     definedWordElement = null;
     definedWordIndex = -1;
+    isManuallyPaused = false;
 
     // 1. Get the plain text for the speech synthesis engine BEFORE modifying the DOM
     const tempDiv = document.createElement('div');
@@ -349,6 +353,7 @@ async function readText() {
         stopBtn.disabled = true;
         mainCurrentWordIndex = 0;
         highlightCurrentWord(-1);
+        isManuallyPaused = false; // Reset manual pause flag
     };
 
     mainSpeechUtterance.onpause = function() {
@@ -392,17 +397,35 @@ async function readText() {
 function pauseReading() {
     if (mainSpeechUtterance && !mainSpeechPaused) {
         speechSynthesis.pause();
+        isManuallyPaused = true; // Mark as manually paused
+        console.log('⏸️ Manual pause detected');
+    }
+}
+
+// Auto-pause for definition (doesn't set manual pause flag)
+function autoPauseForDefinition() {
+    if (mainSpeechUtterance && !mainSpeechPaused) {
+        speechSynthesis.pause();
+        console.log('⏸️ Auto-pause for definition');
     }
 }
 
 // Resume paused main reading
 function resumeReading() {
-    // If we have a defined word to resume from, use smart resume
     if (definedWordIndex >= 0 && mainWords && mainWords.length > 0) {
-        console.log('📍 Using smart resume from defined word:', mainWords[definedWordIndex]);
+        // If there's a defined word, always prioritize resuming from that word
+        console.log('📍 Using smart resume from defined word (priority):', mainWords[definedWordIndex]);
         resumeFromDefinedWord();
+        isManuallyPaused = false; // Reset manual pause flag since we're overriding it
+    } else if (isManuallyPaused) {
+        // If manually paused (and no defined word), do regular resume
+        console.log('▶️ Using regular resume (manual pause)');
+        if (mainSpeechUtterance && mainSpeechPaused) {
+            speechSynthesis.resume();
+            isManuallyPaused = false; // Reset manual pause flag
+        }
     } else if (mainSpeechUtterance && mainSpeechPaused) {
-        console.log('▶️ Using regular resume');
+        console.log('▶️ Using regular resume (fallback)');
         speechSynthesis.resume();
     }
 }
@@ -422,6 +445,7 @@ function stopReading() {
     // Reset defined word tracking
     definedWordElement = null;
     definedWordIndex = -1;
+    isManuallyPaused = false;
 }
 
 // Resume reading from the defined word
@@ -497,6 +521,7 @@ async function resumeFromDefinedWord() {
         stopBtn.disabled = true;
         mainCurrentWordIndex = 0;
         highlightCurrentWord(-1);
+        isManuallyPaused = false; // Reset manual pause flag
     };
 
     mainSpeechUtterance.onpause = function() {
@@ -538,7 +563,7 @@ async function resumeFromDefinedWord() {
     setTimeout(() => {
         speechSynthesis.speak(mainSpeechUtterance);
         console.log('✅ New utterance started');
-    }, 100);
+    }, 50);
 }
 
 // Show error message
@@ -614,13 +639,14 @@ function handleWordSelection(event) {
         // Limit context to a reasonable length
         context = context.substring(0, 500);
 
-        // Pause main reading when user clicks a word
+        // Pause main reading when user clicks a word (automatic pause, not manual)
         if (isMainSpeaking) {
-            pauseReading();
+            autoPauseForDefinition();
         } else {
             // If reading wasn't active, don't try to resume later
             definedWordElement = null;
             definedWordIndex = -1;
+            isManuallyPaused = false;
         }
 
         // Show loading state
@@ -676,12 +702,12 @@ function closeDefinitionModal() {
     console.log('🎤 mainSpeechUtterance exists:', !!mainSpeechUtterance);
     console.log('📝 mainWords length:', mainWords ? mainWords.length : 'null');
     
-    // Resume reading from the defined word if main reading was active
-    if (mainSpeechPaused && definedWordIndex >= 0 && mainWords && mainWords.length > 0) {
-        console.log('✅ Conditions met - resuming from word:', mainWords[definedWordIndex]);
-        resumeFromDefinedWord();
+    // Resume reading using the smart resume logic
+    if (mainSpeechPaused) {
+        console.log('✅ Main speech was paused - using smart resume logic');
+        resumeReading();
     } else {
-        console.log('❌ Resume conditions not met');
+        console.log('❌ Main speech not paused - no resume needed');
     }
 }
 
