@@ -162,25 +162,21 @@ body {
 }
 
 .modal-speech-controls {
-    position: absolute;
-    /* top: 50%; */
+    position: fixed;
+    bottom: 62px;
     left: 50%;
-    transform: translate(-50%, -50%);
-    bottom: 20px;
-    /* left: 0; */
-    width: 20%;
+    transform: translateX(-50%);
     display: flex;
-    justify-content: center;
     gap: 10px;
     padding: 10px;
     box-shadow: 0 9px #2E6F40;
     background-color: #95D3A6;
     border: solid black 1px;
     border-radius: 30px;
+    z-index: 1001;
 }
 
 .modal-speech-controls button {
-    /* background-color: #95D3A6; */
     border: none;
     border-radius: 50%;
     width: 60px;
@@ -191,20 +187,22 @@ body {
     cursor: pointer;
 }
 
-#modalReadBtn {
+/* Modal play button states */
+#modalPlayBtn {
     background-image: url('../static/assets/Play\ Button-unselected.png');
 }
 
+#modalPlayBtn.playing {
+    background-image: url('../static/assets/Play\ Button-selected.png');
+}
+
+/* Modal pause button states */
 #modalPauseBtn {
+    background-image: url('../static/assets/Pause\ Button-Selected.png');
+}
+
+#modalPauseBtn.playing {
     background-image: url('../static/assets/Pause\ Button-unselected.png');
-}
-
-#modalResumeBtn {
-    background-image: url('../static/assets/Play\ Button-unselected.png');
-}
-
-#modalStopBtn {
-    background-image: url('../static/assets/x.png');
 }
 
 .loading-overlay {
@@ -266,7 +264,6 @@ body {
 }
 
 #speech-controls button {
-    /* background-color: white; */
     border: none;
     border-radius: 50%;
     width: 60px;
@@ -277,20 +274,22 @@ body {
     cursor: pointer;
 }
 
-#readBtn {
-    background-image: url('../static/assets/Play\ Button-unselected.png');
+/* Play button states */
+#playBtn {
+    background-image: url('../static/assets/Play Button-unselected.png');
 }
 
+#playBtn.playing {
+    background-image: url('../static/assets/Play Button-selected.png');
+}
+
+/* Pause button states */
 #pauseBtn {
-    background-image: url('../static/assets/Pause\ Button-unselected.png');
+    background-image: url('../static/assets/Pause Button-Selected.png');
 }
 
-#resumeBtn {
-    background-image: url('../static/assets/Play\ Button-unselected.png');
-}
-
-#stopBtn {
-    background-image: url('../static/assets/x.png');
+#pauseBtn.playing {
+    background-image: url('../static/assets/Pause Button-unselected.png');
 }
 
 #fileInput {
