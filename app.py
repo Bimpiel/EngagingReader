@@ -4,13 +4,19 @@ import glob                       # For file pattern matching (e.g., *.jpg)
 import base64                     # To encode image data into base64
 import json                       # To work with JSON data structures
 import logging                    # For logging runtime events and debugging
+import io                         # For in-memory binary operations
 from flask import Flask, render_template, request, jsonify  # Flask web framework
 from google import genai         # Google's Gemini (GenAI) client
 from google.genai import types   # Needed to construct content parts and config
 from dotenv import load_dotenv   # Load environment variables from .env file
+from PIL import Image, ImageFilter  # Pillow for image processing
+import pillow_heif               # HEIC/HEIF image format support
 
 # Load environment variables from .env file
 load_dotenv()
+
+# Register HEIC file format opener with Pillow
+pillow_heif.register_heif_opener()
 
 # === Logging Setup ===
 logging.basicConfig(level=logging.INFO)
@@ -49,10 +55,66 @@ def initialize_genai_client():
 client = initialize_genai_client()
 
 # === Helper Function: Get Latest Image ===
-def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png")):
+def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png", "heic", "heif")):
     # Find all image files with matching extensions
     files = [f for ext in extensions for f in glob.glob(os.path.join(directory, f"*.{ext}"))]
     return max(files, key=os.path.getmtime) if files else None  # Return latest one or None
+
+# === Helper Function: Standardize Image ===
+def standardize_image(input_image_bytes: bytes, options: dict = None) -> bytes:
+    """
+    Standardizes an image by resizing, sharpening, and compressing to JPEG.
+    Ideal for processing user-uploaded photos to ensure consistency and performance.
+
+    Args:
+        input_image_bytes: The raw bytes of the input image (HEIC, JPEG, etc.).
+        options: A dictionary for optional settings.
+            - max_dimension (int): The maximum width or height. Defaults to 2048.
+            - quality (int): The output JPEG quality (1-95). Defaults to 85.
+
+    Returns:
+        The raw bytes of the processed JPEG image.
+        
+    Raises:
+        IOError: If the image format is not supported or the data is corrupt.
+    """
+    if options is None:
+        options = {}
+
+    settings = {
+        'max_dimension': options.get('max_dimension', 2048),
+        'quality': options.get('quality', 85)
+    }
+
+    try:
+        # Open the image from in-memory bytes
+        image_stream = io.BytesIO(input_image_bytes)
+        with Image.open(image_stream) as img:
+            # If image has transparency (like some PNGs or HEICs), convert it to RGB
+            # as JPEG does not support an alpha channel.
+            if img.mode in ("RGBA", "P"):
+                img = img.convert("RGB")
+
+            # Resize the image while maintaining aspect ratio
+            img.thumbnail((settings['max_dimension'], settings['max_dimension']))
+
+            # Sharpen the image to enhance text clarity
+            img = img.filter(ImageFilter.SHARPEN)
+
+            # Save the processed image to an in-memory buffer
+            output_buffer = io.BytesIO()
+            img.save(
+                output_buffer,
+                format="JPEG",
+                quality=settings['quality'],
+                optimize=True  # Makes an extra pass to find best compression
+            )
+            return output_buffer.getvalue()
+
+    except Exception as e:
+        print(f"Error during image standardization: {e}")
+        # Re-raising the exception allows the calling function to handle the error
+        raise
 
 # === Core Function: Process Uploaded Image and Extract Markdown ===
 def process_image(image_path):
@@ -94,13 +156,39 @@ Footnotes:
 
 Completeness: Ensure all extracted (or translated) text, including any URLs, is present in the final output.""")
 
-    # Open the image, encode it in base64, and decode it back to binary
+    # Read and standardize the image for optimal OCR processing
     with open(image_path, "rb") as img_file:
-        img_base64 = base64.b64encode(img_file.read()).decode("utf-8")
+        original_image_bytes = img_file.read()
+    
+    try:
+        # Standardize the image to improve OCR accuracy and reduce processing time
+        standardized_image_bytes = standardize_image(original_image_bytes)
+        logger.info(f"Image standardized: {len(original_image_bytes)} -> {len(standardized_image_bytes)} bytes")
+        
+        # Use standardized image data
+        image_data = standardized_image_bytes
+        mime_type = "image/jpeg"  # Standardized images are always JPEG
+        
+    except Exception as e:
+        # Fall back to original image if standardization fails
+        logger.warning(f"Image standardization failed, using original: {e}")
+        image_data = original_image_bytes
+        
+        # Determine MIME type based on file extension for fallback
+        _, file_extension = os.path.splitext(image_path.lower())
+        if file_extension in ['.png']:
+            mime_type = "image/png"
+        elif file_extension in ['.jpg', '.jpeg']:
+            mime_type = "image/jpeg"
+        elif file_extension in ['.heic', '.heif']:
+            mime_type = "image/heic"
+        else:
+            # Default to JPEG for unsupported formats
+            mime_type = "image/jpeg"
 
     image_part = types.Part.from_bytes(
-        data=base64.b64decode(img_base64),
-        mime_type="image/jpeg",  # Change this if your upload supports PNG
+        data=image_data,
+        mime_type=mime_type,
     )
 
     # Package the user message as content parts for Gemini
