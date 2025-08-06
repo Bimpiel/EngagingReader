@@ -1,15 +1,17 @@
 # Engaging Reader
 
-An interactive reading application that uses Google's Gemini AI (via Vertex AI) to extract text from uploaded images and provides an enhanced reading experience with text-to-speech functionality and contextual word definitions.
+An interactive reading application that uses Google's Gemini AI (via Vertex AI) to extract text from uploaded documents and provides an enhanced reading experience with text-to-speech functionality and contextual word definitions. Supports both images and multi-page PDF documents with advanced image optimization.
 
 ## Features
 
-- **Image-to-Text Extraction**: Upload images of documents, books, or any text content and extract readable text using Google's Gemini 2.5 Flash via Vertex AI
+- **Document Processing**: Upload images or multi-page PDF documents to extract readable text using Google's Gemini 2.5 Flash via Vertex AI
+- **Advanced Image Optimization**: Automatic image standardization with compression, resizing, and sharpening for optimal OCR accuracy
+- **Multi-Format Support**: Process JPEG, PNG, HEIC/HEIF images and PDF documents up to 50MB
 - **Text-to-Speech with Word Highlighting**: Listen to extracted text with synchronized word-by-word highlighting during speech
 - **Interactive Definitions**: Double-click on any word to get contextual, accessible definitions designed for adults with low literacy
 - **Format Preservation**: Maintains original document formatting (headings, paragraphs, tables) while adding speech functionality
 - **Clean, Accessible UI**: Designed with readability and accessibility in mind
-- **Drag & Drop Support**: Easy file upload with visual feedback
+- **Drag & Drop Support**: Easy file upload with visual feedback for both images and PDFs
 
 ## Prerequisites
 
@@ -111,13 +113,16 @@ The application will be available at `http://localhost:5000`
 
 ## Usage
 
-1. **Upload an Image**: Click the upload area or drag and drop an image containing text
-2. **Wait for Processing**: The AI will extract and format the text from your image while preserving document structure
+1. **Upload a Document**: Click the upload area or drag and drop an image or PDF containing text
+2. **Automatic Processing**: The system will:
+   - Optimize images for better OCR accuracy (resize, compress, sharpen)
+   - Process multi-page PDFs directly without conversion
+   - Extract and format text while preserving document structure
 3. **Read Interactively**: 
    - Use the speech controls to listen to the text with synchronized word highlighting
    - Double-click on any word to get contextual, accessible definitions
    - Pause, resume, or stop reading at any time
-4. **Navigate**: Click the "Engaging Reader" banner to start over with a new image
+4. **Navigate**: Click the "Engaging Reader" banner to start over with a new document
 
 ## Key Features
 
@@ -137,6 +142,15 @@ The application will be available at `http://localhost:5000`
 - **Multi-language support**: Extracts English content or translates non-English documents
 - **Format preservation**: Maintains tables, headings, lists, and formatting
 - **Smart text extraction** using Gemini 2.5 Flash model
+- **PDF multi-page processing**: Handle complex documents with multiple pages
+- **Advanced image optimization**: Automatic standardization for improved OCR accuracy
+
+### Image Processing
+- **Automatic optimization**: Images resized to 2048px max dimension with 85% JPEG quality
+- **Format conversion**: HEIC/HEIF files automatically converted for universal compatibility
+- **Image enhancement**: Sharpening filter applied to improve text clarity
+- **Size reduction**: Typically 50-70% file size reduction while maintaining quality
+- **Fallback protection**: Graceful handling if optimization fails
 
 ## Environment Variables Reference
 
@@ -150,18 +164,37 @@ The application will be available at `http://localhost:5000`
 
 ## Supported File Types
 
-- JPEG (.jpg, .jpeg)
-- PNG (.png)
-- Maximum file size: 5MB
+### Images
+- JPEG (.jpg, .jpeg) - with automatic optimization
+- PNG (.png) - with automatic optimization  
+- HEIC/HEIF (.heic, .heif) - modern iPhone formats with full support
+
+### Documents
+- PDF (.pdf) - multi-page document support
+
+### File Size Limits
+- Maximum file size: 50MB (generous limit for high-resolution documents)
+- Automatic optimization reduces processed file sizes by 50-70%
 
 ## Technical Architecture
 
 - **Backend**: Flask application with Google Cloud Vertex AI integration
 - **Frontend**: Vanilla JavaScript with Web Speech API
+- **Image Processing**: Pillow (PIL) with HEIC/HEIF support via pillow-heif
 - **AI Models**: 
-  - Gemini 2.5 Flash for image processing and text extraction
-  - Gemini 2.0 Flash for contextual word definitions
+  - Gemini 2.5 Flash for document processing and text extraction
+  - Gemini 2.5 Flash Lite for contextual word definitions
+- **File Processing**: Automatic format detection and optimization
 - **Deployment**: Ready for Render.com with included `render.yaml`
+
+## Dependencies
+
+Key libraries used:
+- **Flask**: Web framework
+- **google-genai**: Google Gemini AI integration
+- **Pillow**: Advanced image processing and optimization
+- **pillow-heif**: HEIC/HEIF format support for modern devices
+- **python-dotenv**: Environment variable management
 
 ## Troubleshooting
 
@@ -186,6 +219,16 @@ The application will be available at `http://localhost:5000`
    - Check that port 5000 isn't already in use
    - Set a different port using the `PORT` environment variable
    - Verify all dependencies are installed: `pip install -r requirements.txt`
+
+5. **Image processing errors**
+   - System falls back to original image if optimization fails
+   - Check that Pillow and pillow-heif are properly installed
+   - For HEIC files, ensure pillow-heif is compatible with your system
+
+6. **PDF upload issues**
+   - Ensure your browser supports the HTML5 file API
+   - Check file size is under 50MB limit
+   - Verify PDF is not password-protected or corrupted
 
 ### Logs
 
