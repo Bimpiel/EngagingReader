@@ -54,9 +54,9 @@ def initialize_genai_client():
 # Create the client once and reuse it globally
 client = initialize_genai_client()
 
-# === Helper Function: Get Latest Image ===
-def get_latest_image(directory="uploads", extensions=("jpg", "jpeg", "png", "heic", "heif")):
-    # Find all image files with matching extensions
+# === Helper Function: Get Latest File ===
+def get_latest_file(directory="uploads", extensions=("jpg", "jpeg", "png", "heic", "heif", "pdf")):
+    # Find all supported files with matching extensions
     files = [f for ext in extensions for f in glob.glob(os.path.join(directory, f"*.{ext}"))]
     return max(files, key=os.path.getmtime) if files else None  # Return latest one or None
 
@@ -116,10 +116,10 @@ def standardize_image(input_image_bytes: bytes, options: dict = None) -> bytes:
         # Re-raising the exception allows the calling function to handle the error
         raise
 
-# === Core Function: Process Uploaded Image and Extract Markdown ===
-def process_image(image_path):
+# === Core Function: Process Uploaded File and Extract Markdown ===
+def process_file(file_path):
     # Create a prompt to guide Gemini on how to extract the data
-    text_prompt = types.Part.from_text(text="""Act as an expert document intelligence agent. Your mission is to analyze the image, process its content based on the rules below, and generate a clean, well-structured Markdown document.
+    text_prompt = types.Part.from_text(text="""Act as an expert document intelligence agent. Your mission is to analyze the document (image or PDF), process its content based on the rules below, and generate a clean, well-structured Markdown document.
 
 Step 1: Language Processing Rule
 
@@ -156,38 +156,48 @@ Footnotes:
 
 Completeness: Ensure all extracted (or translated) text, including any URLs, is present in the final output.""")
 
-    # Read and standardize the image for optimal OCR processing
-    with open(image_path, "rb") as img_file:
-        original_image_bytes = img_file.read()
+    # Read and process the file (image or PDF)
+    with open(file_path, "rb") as file:
+        original_file_bytes = file.read()
     
-    try:
-        # Standardize the image to improve OCR accuracy and reduce processing time
-        standardized_image_bytes = standardize_image(original_image_bytes)
-        logger.info(f"Image standardized: {len(original_image_bytes)} -> {len(standardized_image_bytes)} bytes")
+    # Determine file type based on extension
+    _, file_extension = os.path.splitext(file_path.lower())
+    
+    if file_extension == '.pdf':
+        # Handle PDF files directly - no standardization needed
+        file_data = original_file_bytes
+        mime_type = "application/pdf"
+        logger.info(f"Processing PDF file: {len(original_file_bytes)} bytes")
         
-        # Use standardized image data
-        image_data = standardized_image_bytes
-        mime_type = "image/jpeg"  # Standardized images are always JPEG
-        
-    except Exception as e:
-        # Fall back to original image if standardization fails
-        logger.warning(f"Image standardization failed, using original: {e}")
-        image_data = original_image_bytes
-        
-        # Determine MIME type based on file extension for fallback
-        _, file_extension = os.path.splitext(image_path.lower())
-        if file_extension in ['.png']:
-            mime_type = "image/png"
-        elif file_extension in ['.jpg', '.jpeg']:
-            mime_type = "image/jpeg"
-        elif file_extension in ['.heic', '.heif']:
-            mime_type = "image/heic"
-        else:
-            # Default to JPEG for unsupported formats
-            mime_type = "image/jpeg"
+    else:
+        # Handle image files with standardization
+        try:
+            # Standardize the image to improve OCR accuracy and reduce processing time
+            standardized_image_bytes = standardize_image(original_file_bytes)
+            logger.info(f"Image standardized: {len(original_file_bytes)} -> {len(standardized_image_bytes)} bytes")
+            
+            # Use standardized image data
+            file_data = standardized_image_bytes
+            mime_type = "image/jpeg"  # Standardized images are always JPEG
+            
+        except Exception as e:
+            # Fall back to original image if standardization fails
+            logger.warning(f"Image standardization failed, using original: {e}")
+            file_data = original_file_bytes
+            
+            # Determine MIME type based on file extension for fallback
+            if file_extension in ['.png']:
+                mime_type = "image/png"
+            elif file_extension in ['.jpg', '.jpeg']:
+                mime_type = "image/jpeg"
+            elif file_extension in ['.heic', '.heif']:
+                mime_type = "image/heic"
+            else:
+                # Default to JPEG for unsupported formats
+                mime_type = "image/jpeg"
 
-    image_part = types.Part.from_bytes(
-        data=image_data,
+    file_part = types.Part.from_bytes(
+        data=file_data,
         mime_type=mime_type,
     )
 
@@ -195,7 +205,7 @@ Completeness: Ensure all extracted (or translated) text, including any URLs, is 
     contents = [
         types.Content(
             role="user",
-            parts=[text_prompt, image_part]
+            parts=[text_prompt, file_part]
         )
     ]
 
@@ -239,8 +249,8 @@ def upload_file():
     file.save(filepath)
 
     try:
-        # Process image and return the extracted markdown text
-        extracted_markdown = process_image(filepath)
+        # Process file (image or PDF) and return the extracted markdown text
+        extracted_markdown = process_file(filepath)
         return jsonify({
             "markdown": extracted_markdown,
             "filename": file.filename

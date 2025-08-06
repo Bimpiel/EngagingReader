@@ -300,23 +300,23 @@ async function uploadImage() {
 
     const file = fileInput.files[0];
 
-    // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif'];
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.heic', '.heif'];
+    // Validate file type - support images and PDFs
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'application/pdf'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.heic', '.heif', '.pdf'];
     
     // Check both MIME type and file extension (HEIC files might not have proper MIME type on all browsers)
     const fileName = file.name.toLowerCase();
     const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
     
     if (!allowedTypes.includes(file.type) && !hasValidExtension) {
-        showError("Please select a valid image file (JPEG, PNG, or HEIC).");
+        showError("Please select a valid file (JPEG, PNG, HEIC, or PDF).");
         return;
     }
 
     // Check file size (50MB limit - generous for high-quality documents)
     const maxSize = 50 * 1024 * 1024; // 50MB in bytes
     if (file.size > maxSize) {
-        showError("File size exceeds 50MB limit. Please choose a smaller file or compress your image.");
+        showError("File size exceeds 50MB limit. Please choose a smaller file.");
         return;
     }
 
