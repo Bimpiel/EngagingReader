@@ -55,7 +55,7 @@ def initialize_genai_client():
 client = initialize_genai_client()
 
 # === Helper Function: Get Latest File ===
-def get_latest_file(directory="uploads", extensions=("jpg", "jpeg", "png", "heic", "heif", "pdf")):
+def get_latest_file(directory="uploads", extensions=("jpg", "jpeg", "png", "heic", "heif", "webp", "pdf")):
     # Find all supported files with matching extensions
     files = [f for ext in extensions for f in glob.glob(os.path.join(directory, f"*.{ext}"))]
     return max(files, key=os.path.getmtime) if files else None  # Return latest one or None
@@ -192,6 +192,8 @@ Completeness: Ensure all extracted (or translated) text, including any URLs, is 
                 mime_type = "image/jpeg"
             elif file_extension in ['.heic', '.heif']:
                 mime_type = "image/heic"
+            elif file_extension in ['.webp']:
+                mime_type = "image/webp"
             else:
                 # Default to JPEG for unsupported formats
                 mime_type = "image/jpeg"

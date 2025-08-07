@@ -301,15 +301,15 @@ async function uploadImage() {
     const file = fileInput.files[0];
 
     // Validate file type - support images and PDFs
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'application/pdf'];
-    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.heic', '.heif', '.pdf'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/heic', 'image/heif', 'image/webp', 'application/pdf'];
+    const allowedExtensions = ['.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp', '.pdf'];
     
     // Check both MIME type and file extension (HEIC files might not have proper MIME type on all browsers)
     const fileName = file.name.toLowerCase();
     const hasValidExtension = allowedExtensions.some(ext => fileName.endsWith(ext));
     
     if (!allowedTypes.includes(file.type) && !hasValidExtension) {
-        showError("Please select a valid file (JPEG, PNG, HEIC, or PDF).");
+        showError("Please select a valid file (JPEG, PNG, HEIC, WebP, or PDF).");
         return;
     }
 
