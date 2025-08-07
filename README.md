@@ -6,7 +6,7 @@ An interactive reading application that uses Google's Gemini AI (via Vertex AI) 
 
 - **Document Processing**: Upload images or multi-page PDF documents to extract readable text using Google's Gemini 2.5 Flash via Vertex AI
 - **Advanced Image Optimization**: Automatic image standardization with compression, resizing, and sharpening for optimal OCR accuracy
-- **Multi-Format Support**: Process JPEG, PNG, HEIC/HEIF images and PDF documents up to 50MB
+- **Multi-Format Support**: Process JPEG, PNG, WebP, HEIC/HEIF images and PDF documents up to 50MB
 - **Text-to-Speech with Word Highlighting**: Listen to extracted text with synchronized word-by-word highlighting during speech
 - **Interactive Definitions**: Double-click on any word to get contextual, accessible definitions designed for adults with low literacy
 - **Format Preservation**: Maintains original document formatting (headings, paragraphs, tables) while adding speech functionality
@@ -166,7 +166,8 @@ The application will be available at `http://localhost:5000`
 
 ### Images
 - JPEG (.jpg, .jpeg) - with automatic optimization
-- PNG (.png) - with automatic optimization  
+- PNG (.png) - with automatic optimization
+- WebP (.webp) - modern web format with excellent compression
 - HEIC/HEIF (.heic, .heif) - modern iPhone formats with full support
 
 ### Documents
