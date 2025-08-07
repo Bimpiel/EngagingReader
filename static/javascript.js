@@ -99,8 +99,6 @@ async function getEnglishVoice() {
     const isWindows = /windows/i.test(userAgent);
     const isMac = /macintosh|mac os x/i.test(userAgent);
     
-    console.log(`🖥️ Platform: ${isWindows ? 'Windows' : isMac ? 'Mac' : 'Other'}, Browser: ${isSafari ? 'Safari' : isChrome ? 'Chrome' : 'Other'}`);
-    
     // Platform and browser-specific voice preferences
     let preferredVoices = [];
     
@@ -185,8 +183,7 @@ async function getEnglishVoice() {
         });
         
         if (voice) {
-            console.log(`🎯 Using preferred voice: ${voice.name} (${voice.lang}) for ${isSafari ? 'Safari' : isChrome ? 'Chrome' : 'Browser'}`);
-            return voice;
+                    return voice;
         }
     }
     
@@ -202,7 +199,6 @@ async function getEnglishVoice() {
     for (const lang of preferredLanguageOrder) {
         const voice = voices.find(v => v.lang && v.lang.toLowerCase().includes(lang.toLowerCase()));
         if (voice) {
-            console.log(`🎯 Using voice by language: ${voice.name || 'Unknown'} (${voice.lang})`);
             return voice;
         }
     }
@@ -218,13 +214,10 @@ async function getEnglishVoice() {
     });
     
     if (englishVoice) {
-        console.log(`🎯 Using fallback English voice: ${englishVoice.name || 'Unknown'} (${englishVoice.lang || 'Unknown'})`);
         return englishVoice;
     }
     
     // Last resort - first available voice
-    console.log('⚠️ No English voice found, using first available voice');
-    console.log('Available voices:', voices.map(v => `${v.name} (${v.lang})`));
     return voices[0];
 }
 
@@ -237,7 +230,6 @@ document.addEventListener('DOMContentLoaded', function() {
     setTimeout(async () => {
         try {
             preloadedVoice = await getEnglishVoice();
-            console.log('🎯 Voice preloaded:', preloadedVoice ? preloadedVoice.name : 'None');
         } catch (error) {
             console.error('❌ Error preloading voice:', error);
         }
@@ -350,7 +342,6 @@ async function uploadImage() {
 
         // Enable play button and store the current text
         currentText = cleanHtml;
-        console.log('📄 currentText set during upload, length:', cleanHtml.length);
         
         // Set initial button states (not playing)
         updateButtonStates(false);
@@ -448,7 +439,6 @@ function highlightModalCurrentWord(index) {
 // Stop all speech synthesis
 function stopAllSpeech() {
     if (speechSynthesis.speaking || speechSynthesis.paused) {
-        console.log('🛑 Stopping all speech synthesis');
         speechSynthesis.cancel();
     }
     // Don't immediately reset speaking states as the error handlers might need them
@@ -457,12 +447,7 @@ function stopAllSpeech() {
 
 // Read the extracted text aloud with highlighting
 function readText() {
-    console.log('🎵 readText called!');
-    console.log('📝 currentText:', currentText ? 'HAS CONTENT' : 'EMPTY/NULL');
-    console.log('🔘 playBtn disabled?', playBtn.disabled);
-    
     if (!currentText) {
-        console.log('❌ No currentText - returning early');
         return;
     }
 
@@ -488,7 +473,7 @@ function readText() {
     // Chrome fix: Start a dummy utterance immediately to establish speech context
     const isChrome = /chrome/i.test(navigator.userAgent) && !/edg/i.test(navigator.userAgent);
     if (isChrome) {
-        console.log('🔧 Chrome detected - starting dummy utterance for context');
+
         const dummyUtterance = new SpeechSynthesisUtterance('');
         dummyUtterance.volume = 0;
         speechSynthesis.speak(dummyUtterance);
@@ -499,11 +484,11 @@ function readText() {
 
     // Use preloaded voice (Chrome compatibility fix) or fallback
     if (preloadedVoice) {
-        console.log('🎯 Using preloaded voice:', preloadedVoice.name);
+
         mainSpeechUtterance.voice = preloadedVoice;
         mainSpeechUtterance.lang = preloadedVoice.lang;
     } else {
-        console.log('⚠️ No preloaded voice available - using system default');
+
         mainSpeechUtterance.lang = 'en-US';
         // Try to load voice asynchronously in background for next time
         getEnglishVoice().then(voice => {
@@ -533,7 +518,7 @@ function readText() {
     };
 
     mainSpeechUtterance.onend = function() {
-        console.log('🏁 Speech ended');
+
         isMainSpeaking = false;
         mainSpeechPaused = false;
         updateButtonStates(false);
@@ -553,7 +538,7 @@ function readText() {
     };
 
     mainSpeechUtterance.onstart = function() {
-        console.log('✅ Speech actually started');
+        
         isMainSpeaking = true;
         updateButtonStates(true);
     };
@@ -565,9 +550,9 @@ function readText() {
         if (event.error !== 'interrupted' && event.error !== 'canceled') {
             // Chrome fallback: try again with a fresh utterance
             if (isChrome && event.error !== 'not-allowed') {
-                console.log('🔧 Attempting Chrome fallback...');
+    
                 setTimeout(() => {
-                    console.log('🔄 Retrying speech synthesis for Chrome...');
+        
                     const retryUtterance = new SpeechSynthesisUtterance(cleanText);
                     retryUtterance.voice = mainSpeechUtterance.voice;
                     retryUtterance.lang = mainSpeechUtterance.lang;
@@ -588,8 +573,6 @@ function readText() {
                 isMainSpeaking = false;
                 stopReading();
             }
-        } else {
-            console.log('🔇 Speech cancelled/interrupted (expected):', event.error);
         }
     };
 
@@ -597,22 +580,22 @@ function readText() {
     updateButtonStates(true);
 
     // Start speaking
-    console.log('🗣️ About to call speechSynthesis.speak()');
-    console.log('📊 cleanText length:', cleanText.length);
-    console.log('🔢 Word spans found:', mainWordSpans.length);
-    console.log('🎯 Voice being used:', mainSpeechUtterance.voice ? mainSpeechUtterance.voice.name : 'System default');
+
+
+
+
     
     // Chrome-specific: Try immediate start first if we have preloaded voice, then fallback to delayed
     if (isChrome) {
         if (preloadedVoice) {
-            console.log('🚀 Chrome with preloaded voice - attempting immediate start');
+    
             speechSynthesis.speak(mainSpeechUtterance);
-            console.log('✅ speechSynthesis.speak() called immediately!');
+    
             
             // Still monitor for silent failures
             setTimeout(() => {
                 if (isMainSpeaking && !speechSynthesis.speaking) {
-                    console.log('⚠️ Immediate start failed - trying delayed restart');
+        
                     speechSynthesis.cancel();
                     setTimeout(() => {
                         speechSynthesis.speak(mainSpeechUtterance);
@@ -620,15 +603,15 @@ function readText() {
                 }
             }, 200);
         } else {
-            console.log('⏳ Chrome without preloaded voice - using delayed start');
+    
             setTimeout(() => {
                 speechSynthesis.speak(mainSpeechUtterance);
-                console.log('✅ speechSynthesis.speak() called (Chrome delayed)!');
+        
                 
                 // Set a timeout to detect if Chrome is ignoring the speech request
                 setTimeout(() => {
                     if (isMainSpeaking && !speechSynthesis.speaking) {
-                        console.log('⚠️ Chrome may have silently failed - trying manual restart');
+            
                         speechSynthesis.cancel();
                         speechSynthesis.speak(mainSpeechUtterance);
                     }
@@ -637,38 +620,38 @@ function readText() {
         }
     } else {
         speechSynthesis.speak(mainSpeechUtterance);
-        console.log('✅ speechSynthesis.speak() called!');
+
     }
 }
 
 // Handle play button click - starts or resumes playback
 function handlePlayClick() {
-    console.log('🎵 Play button clicked!');
+
     
     if (!currentText) {
-        console.log('❌ No currentText available');
+
         return;
     }
     
     // If paused, resume
     if (mainSpeechUtterance && mainSpeechPaused) {
-        console.log('▶️ Resuming paused speech');
+
         resumeReading();
     } else if (isMainSpeaking) {
         // If already playing, restart from beginning
-        console.log('🔄 Restarting speech from beginning');
+
         stopReading();
         setTimeout(() => readText(), 100); // Small delay to ensure clean restart
     } else {
         // Start new playback
-        console.log('🎵 Starting new speech');
+
         readText();
     }
 }
 
 // Handle pause button click - pauses playback
 function handlePauseClick() {
-    console.log('⏸️ Pause button clicked!');
+
     
     if (isMainSpeaking && !mainSpeechPaused) {
         pauseReading();
@@ -680,7 +663,7 @@ function pauseReading() {
     if (mainSpeechUtterance && !mainSpeechPaused) {
         speechSynthesis.pause();
         isManuallyPaused = true; // Mark as manually paused
-        console.log('⏸️ Manual pause detected');
+
     }
 }
 
@@ -688,7 +671,7 @@ function pauseReading() {
 function autoPauseForDefinition() {
     if (mainSpeechUtterance && !mainSpeechPaused) {
         speechSynthesis.pause();
-        console.log('⏸️ Auto-pause for definition');
+
     }
 }
 
@@ -696,25 +679,25 @@ function autoPauseForDefinition() {
 function resumeReading() {
     if (definedWordIndex >= 0 && mainWords && mainWords.length > 0) {
         // If there's a defined word, always prioritize resuming from that word
-        console.log('📍 Using smart resume from defined word (priority):', mainWords[definedWordIndex]);
+
         resumeFromDefinedWord();
         isManuallyPaused = false; // Reset manual pause flag since we're overriding it
     } else if (isManuallyPaused) {
         // If manually paused (and no defined word), do regular resume
-        console.log('▶️ Using regular resume (manual pause)');
+
         if (mainSpeechUtterance && mainSpeechPaused) {
             speechSynthesis.resume();
             isManuallyPaused = false; // Reset manual pause flag
         }
     } else if (mainSpeechUtterance && mainSpeechPaused) {
-        console.log('▶️ Using regular resume (fallback)');
+
         speechSynthesis.resume();
     }
 }
 
 // Stop main reading completely
 function stopReading() {
-    console.log('🛑 Stopping speech');
+
     if (isMainSpeaking) {
         speechSynthesis.cancel();
         isMainSpeaking = false;
@@ -731,21 +714,15 @@ function stopReading() {
 
 // Resume reading from the defined word
 async function resumeFromDefinedWord() {
-    console.log('🔄 resumeFromDefinedWord called');
-    console.log('📍 definedWordIndex:', definedWordIndex);
-    console.log('📝 mainWords:', mainWords ? mainWords.slice(Math.max(0, definedWordIndex-2), definedWordIndex+3) : 'null');
-    
     if (definedWordIndex < 0 || !mainWords || !mainWordSpans) {
-        console.log('❌ Cannot resume from defined word - invalid index or missing data');
+
         return;
     }
 
     // Only cancel speech if it's actually speaking, not if it's just paused
     if (speechSynthesis.speaking && !speechSynthesis.paused) {
-        console.log('🛑 Canceling active speech');
         speechSynthesis.cancel();
     } else if (speechSynthesis.paused) {
-        console.log('⏸️ Speech is paused, canceling it');
         speechSynthesis.cancel();
     }
     
@@ -757,9 +734,6 @@ async function resumeFromDefinedWord() {
     // Create text starting from the defined word
     const remainingWords = mainWords.slice(definedWordIndex);
     const textToSpeak = remainingWords.join(' ');
-    
-    console.log('🗣️ Text to speak (first 50 chars):', textToSpeak.substring(0, 50) + '...');
-    console.log('📊 Remaining words count:', remainingWords.length);
 
     // Create new utterance for the remaining text
     mainSpeechUtterance = new SpeechSynthesisUtterance(textToSpeak);
@@ -795,7 +769,6 @@ async function resumeFromDefinedWord() {
     };
 
     mainSpeechUtterance.onend = function() {
-        console.log('🏁 Speech ended (resume function)');
         isMainSpeaking = false;
         mainSpeechPaused = false;
         updateButtonStates(false);
@@ -820,8 +793,6 @@ async function resumeFromDefinedWord() {
             console.error('Main SpeechSynthesis error:', event);
             isMainSpeaking = false;
             stopReading();
-        } else {
-            console.log('🔇 Speech cancelled/interrupted (expected):', event.error);
         }
     };
 
@@ -832,12 +803,9 @@ async function resumeFromDefinedWord() {
     updateButtonStates(true);
 
     // Start speaking from the defined word
-    console.log(`🗣️ Resuming reading from word "${mainWords[definedWordIndex]}" at index ${definedWordIndex}`);
-    
     // Small delay to ensure previous speech is completely cancelled
     setTimeout(() => {
         speechSynthesis.speak(mainSpeechUtterance);
-        console.log('✅ New utterance started');
     }, 50);
 }
 
@@ -878,11 +846,11 @@ function handleWordSelection(event) {
             // Find the index of this word in the main word spans array
             if (mainWordSpans && mainWordSpans.length > 0) {
                 definedWordIndex = mainWordSpans.indexOf(target);
-                console.log('🎯 Word clicked:', selectedText);
-                console.log('📍 Word index found:', definedWordIndex);
-                console.log('📊 Total words:', mainWordSpans.length);
+            
+            
+            
             } else {
-                console.log('⚠️ mainWordSpans not available, cannot track word index');
+        
                 definedWordIndex = -1;
             }
         } else {
@@ -967,19 +935,9 @@ function closeDefinitionModal() {
     stopDefinitionReading();
     definitionModal.style.display = 'none';
     
-    // Debug logging
-    console.log('🔍 Modal closed - checking resume conditions:');
-    console.log('📊 mainSpeechPaused:', mainSpeechPaused);
-    console.log('📍 definedWordIndex:', definedWordIndex);
-    console.log('🎤 mainSpeechUtterance exists:', !!mainSpeechUtterance);
-    console.log('📝 mainWords length:', mainWords ? mainWords.length : 'null');
-    
     // Resume reading using the smart resume logic
     if (mainSpeechPaused) {
-        console.log('✅ Main speech was paused - using smart resume logic');
         resumeReading();
-    } else {
-        console.log('❌ Main speech not paused - no resume needed');
     }
 }
 
@@ -1011,33 +969,33 @@ async function getDefinition(word, context) {
 
 // Handle modal play button click - starts or resumes modal playback
 function handleModalPlayClick() {
-    console.log('🎵 Modal play button clicked!');
+
     
     const definitionText = definitionContent.textContent;
     if (!definitionText) {
-        console.log('❌ No definition text available');
+
         return;
     }
     
     // If paused, resume
     if (modalSpeechUtterance && modalSpeechPaused) {
-        console.log('▶️ Resuming modal speech');
+
         resumeDefinitionReading();
     } else if (isModalSpeaking) {
         // If already playing, restart from beginning
-        console.log('🔄 Restarting modal speech from beginning');
+
         stopDefinitionReading();
         setTimeout(() => readDefinitionAloud(), 100); // Small delay to ensure clean restart
     } else {
         // Start new playback
-        console.log('🎵 Starting new modal speech');
+
         readDefinitionAloud();
     }
 }
 
 // Handle modal pause button click - pauses modal playback
 function handleModalPauseClick() {
-    console.log('⏸️ Modal pause button clicked!');
+
     
     if (isModalSpeaking && !modalSpeechPaused) {
         pauseDefinitionReading();
@@ -1088,13 +1046,13 @@ async function readDefinitionAloud() {
     };
 
     modalSpeechUtterance.onstart = function() {
-        console.log('✅ Modal speech actually started');
+        
         isModalSpeaking = true;
         updateModalButtonStates(true);
     };
 
     modalSpeechUtterance.onend = function() {
-        console.log('🏁 Modal speech ended');
+
         isModalSpeaking = false;
         modalSpeechPaused = false;
         updateModalButtonStates(false);
@@ -1144,7 +1102,7 @@ function resumeDefinitionReading() {
 
 // Stop definition reading completely
 function stopDefinitionReading() {
-    console.log('🛑 Stopping modal speech');
+
     if (isModalSpeaking) {
         speechSynthesis.cancel();
         isModalSpeaking = false;
