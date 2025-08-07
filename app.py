@@ -226,7 +226,8 @@ Completeness: Ensure all extracted (or translated) text, including any URLs, is 
         contents=contents,
         config=config,
     ):
-        output_text += chunk.text
+        if chunk.text:  # Only add text if it's not None
+            output_text += chunk.text
 
     return output_text  # Return the markdown-formatted output
 
