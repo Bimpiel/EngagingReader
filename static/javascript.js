@@ -1216,6 +1216,16 @@ function handleGlobalKeydown(event) {
         return;
     }
 
+    // Handle Escape key to close modal
+    if (event.code === 'Escape') {
+        const modalIsOpen = definitionModal.style.display === 'block';
+        if (modalIsOpen) {
+            event.preventDefault();
+            closeDefinitionModal();
+        }
+        return;
+    }
+
     // Handle word navigation (only when text is loaded and not in modal)
     const modalIsOpen = definitionModal.style.display === 'block';
     if (currentText && !modalIsOpen) {
@@ -1250,14 +1260,8 @@ function handleGlobalKeydown(event) {
                 break;
                 
             case 'Enter':
-                if (activeElement && activeElement.classList.contains('word')) {
-                    event.preventDefault();
-                    // Pause audio if playing and get definition
-                    if (isMainSpeaking) {
-                        pauseReading();
-                    }
-                    handleWordSelection({target: activeElement});
-                }
+                event.preventDefault();
+                handleEnterForDefinition();
                 break;
         }
     }
@@ -1533,5 +1537,55 @@ function announceError(message) {
     const errorElement = document.getElementById('upload-errors');
     if (errorElement) {
         errorElement.textContent = message;
+    }
+}
+
+// Handle Enter key for getting definitions intelligently
+function handleEnterForDefinition() {
+    let targetWord = null;
+    let targetIndex = -1;
+    
+    // Priority 1: If a word currently has keyboard focus, use that
+    if (focusedWordIndex >= 0 && focusedWordIndex < mainWordSpans.length) {
+        targetWord = mainWordSpans[focusedWordIndex];
+        targetIndex = focusedWordIndex;
+    }
+    // Priority 2: If speech is currently playing, use the current speaking word
+    else if (isMainSpeaking && mainCurrentWordIndex >= 0 && mainCurrentWordIndex < mainWordSpans.length) {
+        targetWord = mainWordSpans[mainCurrentWordIndex];
+        targetIndex = mainCurrentWordIndex;
+    }
+    // Priority 3: If speech is paused and we have a last current word, use that
+    else if (mainSpeechPaused && mainCurrentWordIndex >= 0 && mainCurrentWordIndex < mainWordSpans.length) {
+        targetWord = mainWordSpans[mainCurrentWordIndex];
+        targetIndex = mainCurrentWordIndex;
+    }
+    // Priority 4: If we have a defined word from previous interaction, use that
+    else if (definedWordIndex >= 0 && definedWordIndex < mainWordSpans.length) {
+        targetWord = mainWordSpans[definedWordIndex];
+        targetIndex = definedWordIndex;
+    }
+    // Priority 5: If none of the above, use the first word as fallback
+    else if (mainWordSpans.length > 0) {
+        targetWord = mainWordSpans[0];
+        targetIndex = 0;
+    }
+    
+    // If we found a word to define
+    if (targetWord) {
+        // Pause audio if playing
+        if (isMainSpeaking) {
+            pauseReading();
+        }
+        
+        // Set focus to this word for proper modal return behavior
+        focusedWordIndex = targetIndex;
+        definedWordIndex = targetIndex;
+        
+        // Get the definition
+        handleWordSelection({target: targetWord});
+        
+        // Announce to screen readers what we're doing
+        announceStatus(`Getting definition for "${targetWord.textContent}"`);
     }
 }
