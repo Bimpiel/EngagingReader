@@ -19,15 +19,24 @@
 <body>
     <h1 class="banner" onClick="window.location.reload();" >Engaging Reader</h1>
 
-    <div id="upload-container">
-        <div id="drop-area" class="drop-area">
+    <main role="main">
+        <div id="upload-container">
+        <div id="drop-area" class="drop-area" 
+             role="button" 
+             tabindex="0"
+             aria-label="Upload document: click to browse files or drag and drop. Supported: Images and PDF files up to 50MB">
             <img src="static/assets/upload.png" alt="Upload File">
             <label for="fileInput" class="labBtn">Upload File</label>
             <input type="file" id="fileInput" accept="image/*,.png,.jpg,.jpeg,.heic,.heif,.webp,.pdf,application/pdf">
         </div>
-    </div>
+        </div>
 
-    <div id="text-display"></div>
+        <div id="text-display" tabindex="0" role="document" aria-label="Extracted text content"></div>
+    </main>
+
+    <!-- ARIA live regions for status announcements -->
+    <div aria-live="polite" aria-atomic="true" class="sr-only" id="upload-status"></div>
+    <div aria-live="assertive" aria-atomic="true" class="sr-only" id="upload-errors"></div>
 
     <div id="loading-overlay" class="loading-overlay">
         <h1 class="banner">Engaging Reader</h1>

@@ -15,6 +15,19 @@ body {
     -moz-osx-font-smoothing: grayscale;
 }
 
+/* Screen reader only content */
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
 .banner {
     position: fixed;
     top: 0;
@@ -24,8 +37,8 @@ body {
     background-color: #2E6F40;
     margin-top: 0;
     color: white;
-    font-size: 32pt; /* Fallback for older browsers */
-    font-size: clamp(24pt, 6vw, 38pt); /* Optimized scaling from mobile to desktop */
+    font-size: 2rem; /* Fallback for older browsers */
+    font-size: clamp(1.5rem, 6vw, 2.4rem); /* Optimized scaling from mobile to desktop, respects user font preferences */
     font-weight: 700;
     font-style: normal;
     z-index: 100;
@@ -55,6 +68,13 @@ body {
     height: 100%;
     padding: clamp(10px, 3vw, 20px);
     box-sizing: border-box;
+}
+
+/* Drop area focus indicator for keyboard accessibility */
+.drop-area:focus {
+    outline: 3px solid #2E6F40;
+    outline-offset: 2px;
+    background-color: rgba(46, 111, 64, 0.1);
 }
 
 #drop-area img {
@@ -184,12 +204,62 @@ body {
     transition: background-color 0.2s ease; /* Smooth transition only on hover */
 }
 
+/* Keyboard focus indicator */
+.word:focus,
+.word.keyboard-focused {
+    outline: 3px solid #2E6F40 !important;
+    outline-offset: 2px;
+}
+
+/* When word is only focused (not speaking) */
+.word.keyboard-focused:not(.current-word) {
+    background-color: rgba(46, 111, 64, 0.15) !important;
+}
+
+/* When word is both focused AND currently being spoken - combine both styles */
+.word.keyboard-focused.current-word,
+.word:focus.current-word {
+    /* Keep the speaking highlight background */
+    background-color: #ffd54f !important; 
+    font-weight: bold !important;
+    /* Add the focus outline */
+    outline: 3px solid #2E6F40 !important;
+    outline-offset: 2px;
+    /* Make the outline more prominent when both states are active */
+    box-shadow: 0 0 0 1px white, 0 0 0 4px #2E6F40;
+}
+
+/* Modal keyboard focus styles - same behavior as main content */
+.definition-word:focus,
+.definition-word.modal-keyboard-focused {
+    outline: 3px solid #2E6F40 !important;
+    outline-offset: 2px;
+}
+
+/* When modal word is only focused (not speaking) */
+.definition-word.modal-keyboard-focused:not(.definition-current-word) {
+    background-color: rgba(46, 111, 64, 0.15) !important;
+}
+
+/* When modal word is both focused AND currently being spoken - combine both styles */
+.definition-word.modal-keyboard-focused.definition-current-word,
+.definition-word:focus.definition-current-word {
+    /* Keep the speaking highlight background */
+    background-color: #ffd54f !important; 
+    font-weight: bold !important;
+    /* Add the focus outline */
+    outline: 3px solid #2E6F40 !important;
+    outline-offset: 2px;
+    /* Make the outline more prominent when both states are active */
+    box-shadow: 0 0 0 1px white, 0 0 0 4px #2E6F40;
+}
+
 .word-line {
     display: block;
 }
 
 #status {
-    font-size: 16px;
+    font-size: 1rem;
     color: white;
     margin-top: 10px;
     opacity: 0;
@@ -443,7 +513,7 @@ body {
 @media screen and (min-device-width: 768px) and (max-device-width: 1024px) and (-webkit-min-device-pixel-ratio: 1.5),
        screen and (min-device-width: 1024px) and (max-device-width: 1366px) and (-webkit-min-device-pixel-ratio: 1.5) {
     .banner {
-        font-size: clamp(38pt, 5vw, 44pt) !important; /* Specific sizing for high-DPI iPad devices */
+        font-size: clamp(2.4rem, 5vw, 2.8rem) !important; /* Specific sizing for high-DPI iPad devices, respects user font preferences */
     }
 }
 

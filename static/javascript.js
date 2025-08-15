@@ -28,9 +28,17 @@ let modalCurrentWordIndex = 0;
 let modalSpeechPaused = false;
 let isModalSpeaking = false;
 
+// Modal keyboard navigation state
+let modalFocusedWordIndex = -1;
+
 // Track the word that was clicked for definition
 let definedWordElement = null;
 let definedWordIndex = -1;
+
+// Keyboard navigation state
+let focusedWordIndex = -1;
+let paragraphBoundaries = []; // Array of {startIndex, endIndex, element} for each paragraph
+let currentParagraphIndex = -1;
 
 // Track if pause was manual (pause button) vs automatic (definition)
 let isManuallyPaused = false;
@@ -238,6 +246,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Hide speech controls initially
     document.getElementById('speech-controls').style.display = 'none';
     
+    // Add global keyboard event listener for spacebar
+    document.addEventListener('keydown', handleGlobalKeydown);
+    
     // Set up event listeners
     document.querySelector('.close-btn').addEventListener('click', closeDefinitionModal);
     window.addEventListener('click', function(event) {
@@ -276,6 +287,24 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
 
+    // Keyboard accessibility for drop area
+    dropArea.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            fileInput.click(); // Trigger file browser
+        }
+    });
+
+    // Click event for drop area (for mouse users)
+    dropArea.addEventListener('click', (e) => {
+        // Only trigger if clicking the drop area itself, not the label button
+        if (e.target === dropArea || e.target.closest('#drop-area') === dropArea) {
+            if (!e.target.classList.contains('labBtn')) {
+                fileInput.click();
+            }
+        }
+    });
+
     // File input change
     fileInput.addEventListener('change', uploadImage);
 });
@@ -287,6 +316,7 @@ async function uploadImage() {
     
     if (!fileInput.files.length) {
         showError("Please select an image file first.");
+        announceError("Please select a file first.");
         return;
     }
 
@@ -302,6 +332,7 @@ async function uploadImage() {
     
     if (!allowedTypes.includes(file.type) && !hasValidExtension) {
         showError("Please select a valid file (JPEG, PNG, HEIC, WebP, or PDF).");
+        announceError("Invalid file type. Please select an image or PDF file.");
         return;
     }
 
@@ -309,12 +340,14 @@ async function uploadImage() {
     const maxSize = 50 * 1024 * 1024; // 50MB in bytes
     if (file.size > maxSize) {
         showError("File size exceeds 50MB limit. Please choose a smaller file.");
+        announceError("File too large. Please choose a file under 50MB.");
         return;
     }
 
     // Show loading state
     loadingOverlay.style.display = 'flex';
     outputDiv.innerHTML = "";
+    announceStatus("Processing file, please wait...");
 
     try {
         const formData = new FormData();
@@ -340,6 +373,9 @@ async function uploadImage() {
         // Immediately wrap words in spans for clickable definitions
         wrapWordsInSpans(outputDiv);
 
+        // Initialize navigation system after words are wrapped
+        initializeWordNavigation();
+
         // Enable play button and store the current text
         currentText = cleanHtml;
         
@@ -351,9 +387,12 @@ async function uploadImage() {
 
         // Hide upload container and show content
         document.getElementById('upload-container').style.display = 'none';
+        
+        announceStatus("Text extracted successfully. Use spacebar to start reading or tab to navigate words.");
 
     } catch (error) {
         showError(error.message);
+        announceError("Failed to process file. Please try again.");
         // Keep speech controls hidden on error
         document.getElementById('speech-controls').style.display = 'none';
     } finally {
@@ -386,6 +425,12 @@ function wrapWordsInSpans(node) {
                 const span = document.createElement('span');
                 span.className = 'word highlight-word';
                 span.textContent = word;
+                
+                // Make word keyboard accessible with roving tabindex
+                span.setAttribute('tabindex', '-1');
+                span.setAttribute('role', 'button');
+                span.setAttribute('aria-label', word);
+                
                 fragment.appendChild(span);
             }
             
@@ -418,6 +463,9 @@ function highlightCurrentWord(index) {
     if (index >= 0 && index < mainWordSpans.length) {
         mainWordSpans[index].classList.add('current-word');
         mainWordSpans[index].classList.add('highlight');
+        
+        // Make keyboard focus follow the speaking word (don't remove speech highlights)
+        setWordFocusFromSpeech(index);
     }
 }
 
@@ -433,6 +481,9 @@ function highlightModalCurrentWord(index) {
     if (index >= 0 && index < modalWordSpans.length) {
         modalWordSpans[index].classList.add('definition-current-word');
         modalWordSpans[index].classList.add('highlight');
+        
+        // Make keyboard focus follow the speaking word in modal (same as main content)
+        setModalWordFocusFromSpeech(index);
     }
 }
 
@@ -541,6 +592,10 @@ function readText() {
         
         isMainSpeaking = true;
         updateButtonStates(true);
+        
+        // Clear ALL existing focus outlines when speech starts
+        // Focus will now follow the speaking word automatically
+        clearAllKeyboardFocus();
     };
 
     mainSpeechUtterance.onerror = function(event) {
@@ -787,6 +842,16 @@ async function resumeFromDefinedWord() {
         updateButtonStates(true); // Show as playing state
     };
 
+    // Add onstart handler for resumeFromDefinedWord function too
+    mainSpeechUtterance.onstart = function() {
+        isMainSpeaking = true;
+        updateButtonStates(true);
+        
+        // Clear ALL existing focus outlines when speech starts
+        // Focus will now follow the speaking word automatically
+        clearAllKeyboardFocus();
+    };
+
     mainSpeechUtterance.onerror = function(event) {
         // Ignore 'interrupted' and 'canceled' errors as they're expected when switching/resuming
         if (event.error !== 'interrupted' && event.error !== 'canceled') {
@@ -846,11 +911,9 @@ function handleWordSelection(event) {
             // Find the index of this word in the main word spans array
             if (mainWordSpans && mainWordSpans.length > 0) {
                 definedWordIndex = mainWordSpans.indexOf(target);
-            
-            
-            
+                // Also store this as the word that opened the modal for focus restoration
+                focusedWordIndex = definedWordIndex;
             } else {
-        
                 definedWordIndex = -1;
             }
         } else {
@@ -911,11 +974,11 @@ function handleWordSelection(event) {
 function showDefinitionModal(word, content) {
     definitionWord.textContent = word;
 
-    // Format the content with word spans for highlighting
+    // Format the content with word spans for highlighting and keyboard access
     definitionContent.innerHTML = content.split('\n').map(paragraph => {
         if (paragraph.trim() === '') return '<div class="word-line"><br></div>';
         return `<div class="word-line">${paragraph.split(' ').map(word =>
-            `<span class="word definition-word">${word}</span>`
+            `<span class="word definition-word" tabindex="-1" role="button" aria-label="${word}">${word}</span>`
         ).join(' ')}</div>`;
     }).join('');
 
@@ -923,6 +986,9 @@ function showDefinitionModal(word, content) {
     modalWordSpans = Array.from(document.querySelectorAll('.definition-word'));
     modalWords = modalWordSpans.map(span => span.textContent);
     modalCurrentWordIndex = 0;
+    
+    // Reset modal focus state
+    modalFocusedWordIndex = -1;
 
     // Reset modal button states
     updateModalButtonStates(false);
@@ -934,6 +1000,11 @@ function showDefinitionModal(word, content) {
 function closeDefinitionModal() {
     stopDefinitionReading();
     definitionModal.style.display = 'none';
+    
+    // Restore focus to the word that opened the modal (as requested)
+    if (definedWordIndex >= 0 && definedWordIndex < mainWordSpans.length) {
+        setWordFocus(definedWordIndex);
+    }
     
     // Resume reading using the smart resume logic
     if (mainSpeechPaused) {
@@ -1049,6 +1120,10 @@ async function readDefinitionAloud() {
         
         isModalSpeaking = true;
         updateModalButtonStates(true);
+        
+        // Clear ALL existing focus outlines when modal speech starts (same as main content)
+        // Focus will now follow the speaking word automatically
+        clearAllModalKeyboardFocus();
     };
 
     modalSpeechUtterance.onend = function() {
@@ -1110,4 +1185,353 @@ function stopDefinitionReading() {
     modalSpeechPaused = false;
     updateModalButtonStates(false);
     highlightModalCurrentWord(-1);
+}
+
+// Handle global keyboard events
+function handleGlobalKeydown(event) {
+    // Don't interfere if user is typing in an input field
+    const activeElement = document.activeElement;
+    if (activeElement && (
+        activeElement.tagName === 'INPUT' || 
+        activeElement.tagName === 'TEXTAREA' || 
+        activeElement.isContentEditable
+    )) {
+        return; // Let the default behavior happen
+    }
+
+    // Handle spacebar for play/pause
+    if (event.code === 'Space') {
+        // Prevent spacebar from scrolling the page
+        event.preventDefault();
+
+        // Context-aware spacebar behavior
+        if (definitionModal.style.display === 'block') {
+            // Modal is open - control modal speech
+            handleModalSpacebar();
+        } else if (currentText) {
+            // Main content is loaded - control main speech
+            handleMainSpacebar();
+        }
+        // If no content is loaded, spacebar does nothing
+        return;
+    }
+
+    // Handle word navigation (only when text is loaded and not in modal)
+    const modalIsOpen = definitionModal.style.display === 'block';
+    if (currentText && !modalIsOpen) {
+        switch (event.code) {
+            case 'Tab':
+                // Tab into text area - focus first word of first paragraph
+                // Only handle if currently focused on text-display div, not if already on a word
+                if (activeElement && activeElement.id === 'text-display') {
+                    event.preventDefault();
+                    focusFirstWordOfFirstParagraph();
+                }
+                break;
+                
+            case 'ArrowLeft':
+                event.preventDefault();
+                navigateToPreviousWord();
+                break;
+                
+            case 'ArrowRight':
+                event.preventDefault();
+                navigateToNextWord();
+                break;
+                
+            case 'ArrowUp':
+                event.preventDefault();
+                navigateToPreviousParagraph();
+                break;
+                
+            case 'ArrowDown':
+                event.preventDefault();
+                navigateToNextParagraph();
+                break;
+                
+            case 'Enter':
+                if (activeElement && activeElement.classList.contains('word')) {
+                    event.preventDefault();
+                    // Pause audio if playing and get definition
+                    if (isMainSpeaking) {
+                        pauseReading();
+                    }
+                    handleWordSelection({target: activeElement});
+                }
+                break;
+        }
+    }
+}
+
+// Handle spacebar for main content speech
+function handleMainSpacebar() {
+    if (!currentText) {
+        return;
+    }
+    
+    if (mainSpeechUtterance && mainSpeechPaused) {
+        // Currently paused - resume from focused word if available, otherwise normal resume
+        if (focusedWordIndex >= 0) {
+            resumeFromFocusedWord();
+        } else {
+            resumeReading();
+        }
+    } else if (isMainSpeaking) {
+        // Currently playing - pause
+        pauseReading();
+    } else {
+        // Not playing - start from focused word if available, otherwise from beginning
+        if (focusedWordIndex >= 0) {
+            startReadingFromFocusedWord();
+        } else {
+            readText();
+        }
+    }
+}
+
+// Handle spacebar for modal speech
+function handleModalSpacebar() {
+    const definitionText = definitionContent.textContent;
+    if (!definitionText) {
+        return;
+    }
+    
+    if (modalSpeechUtterance && modalSpeechPaused) {
+        // Currently paused - resume
+        resumeDefinitionReading();
+    } else if (isModalSpeaking) {
+        // Currently playing - pause
+        pauseDefinitionReading();
+    } else {
+        // Not playing - start
+        readDefinitionAloud();
+    }
+}
+
+// Initialize word navigation system
+function initializeWordNavigation() {
+    // Reset navigation state
+    focusedWordIndex = -1;
+    currentParagraphIndex = -1;
+    paragraphBoundaries = [];
+    
+    // Update word spans array
+    mainWordSpans = Array.from(document.querySelectorAll('.highlight-word'));
+    mainWords = mainWordSpans.map(span => span.textContent);
+    
+    // Detect paragraph boundaries using HTML structure
+    detectParagraphBoundaries();
+}
+
+// Detect paragraph boundaries based on HTML structure (p, div, h1-h6)
+function detectParagraphBoundaries() {
+    const paragraphElements = outputDiv.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6');
+    
+    paragraphElements.forEach((element) => {
+        const wordsInElement = element.querySelectorAll('.highlight-word');
+        if (wordsInElement.length > 0) {
+            // Find the actual indices of these words in the global mainWordSpans array
+            const startIndex = mainWordSpans.indexOf(wordsInElement[0]);
+            const endIndex = mainWordSpans.indexOf(wordsInElement[wordsInElement.length - 1]);
+            
+            // Only add if we found valid indices
+            if (startIndex >= 0 && endIndex >= 0) {
+                paragraphBoundaries.push({
+                    element: element,
+                    startIndex: startIndex,
+                    endIndex: endIndex
+                });
+            }
+        }
+    });
+}
+
+// Focus management with roving tabindex (called by user navigation)
+function setWordFocus(wordIndex) {
+    // Remove focus from previously focused word
+    if (focusedWordIndex >= 0 && focusedWordIndex < mainWordSpans.length) {
+        mainWordSpans[focusedWordIndex].setAttribute('tabindex', '-1');
+        mainWordSpans[focusedWordIndex].classList.remove('keyboard-focused');
+    }
+    
+    // Set focus to new word
+    if (wordIndex >= 0 && wordIndex < mainWordSpans.length) {
+        focusedWordIndex = wordIndex;
+        const wordElement = mainWordSpans[wordIndex];
+        
+        wordElement.setAttribute('tabindex', '0');
+        wordElement.classList.add('keyboard-focused');
+        wordElement.focus();
+        
+        // Update current paragraph index
+        updateCurrentParagraphIndex(wordIndex);
+        
+        // Remove speaking highlight when user navigates (as requested)
+        removeAllSpeakingHighlights();
+    }
+}
+
+// Focus management called by speech system (doesn't remove speech highlights)
+function setWordFocusFromSpeech(wordIndex) {
+    // Remove focus from previously focused word
+    if (focusedWordIndex >= 0 && focusedWordIndex < mainWordSpans.length) {
+        mainWordSpans[focusedWordIndex].setAttribute('tabindex', '-1');
+        mainWordSpans[focusedWordIndex].classList.remove('keyboard-focused');
+    }
+    
+    // Set focus to new word
+    if (wordIndex >= 0 && wordIndex < mainWordSpans.length) {
+        focusedWordIndex = wordIndex;
+        const wordElement = mainWordSpans[wordIndex];
+        
+        wordElement.setAttribute('tabindex', '0');
+        wordElement.classList.add('keyboard-focused');
+        // Don't call wordElement.focus() - this prevents screen reader interruption
+        
+        // Update current paragraph index
+        updateCurrentParagraphIndex(wordIndex);
+        
+        // Don't remove speaking highlights - let them coexist with focus
+    }
+}
+
+// Remove speaking highlights when user navigates
+function removeAllSpeakingHighlights() {
+    mainWordSpans.forEach(span => {
+        span.classList.remove('current-word');
+        span.classList.remove('highlight');
+    });
+}
+
+// Clear all keyboard focus outlines (used when speech starts)
+function clearAllKeyboardFocus() {
+    mainWordSpans.forEach(span => {
+        span.classList.remove('keyboard-focused');
+        span.setAttribute('tabindex', '-1');
+    });
+    focusedWordIndex = -1;
+}
+
+// Clear all modal keyboard focus outlines (used when modal speech starts)
+function clearAllModalKeyboardFocus() {
+    modalWordSpans.forEach(span => {
+        span.classList.remove('modal-keyboard-focused');
+        span.setAttribute('tabindex', '-1');
+    });
+    modalFocusedWordIndex = -1;
+}
+
+// Update current paragraph index based on word index
+function updateCurrentParagraphIndex(wordIndex) {
+    for (let i = 0; i < paragraphBoundaries.length; i++) {
+        const boundary = paragraphBoundaries[i];
+        if (wordIndex >= boundary.startIndex && wordIndex <= boundary.endIndex) {
+            currentParagraphIndex = i;
+            break;
+        }
+    }
+}
+
+// Navigation functions
+function focusFirstWordOfFirstParagraph() {
+    if (paragraphBoundaries.length > 0 && mainWordSpans.length > 0) {
+        const firstParagraph = paragraphBoundaries[0];
+        setWordFocus(firstParagraph.startIndex);
+    }
+}
+
+function navigateToNextWord() {
+    if (focusedWordIndex < 0) {
+        focusFirstWordOfFirstParagraph();
+    } else if (focusedWordIndex < mainWordSpans.length - 1) {
+        setWordFocus(focusedWordIndex + 1);
+    }
+    // Do nothing if at last word (as requested)
+}
+
+function navigateToPreviousWord() {
+    if (focusedWordIndex <= 0) {
+        // Do nothing if at first word or no word focused (as requested)
+        return;
+    } else {
+        setWordFocus(focusedWordIndex - 1);
+    }
+}
+
+function navigateToNextParagraph() {
+    if (currentParagraphIndex < 0) {
+        focusFirstWordOfFirstParagraph();
+    } else if (currentParagraphIndex < paragraphBoundaries.length - 1) {
+        const nextParagraph = paragraphBoundaries[currentParagraphIndex + 1];
+        setWordFocus(nextParagraph.startIndex);
+    }
+    // Do nothing if at last paragraph (as requested)
+}
+
+function navigateToPreviousParagraph() {
+    if (currentParagraphIndex <= 0) {
+        // Do nothing if at first paragraph or no paragraph focused (as requested)
+        return;
+    } else {
+        const prevParagraph = paragraphBoundaries[currentParagraphIndex - 1];
+        setWordFocus(prevParagraph.startIndex);
+    }
+}
+
+// Start reading from the currently focused word
+function startReadingFromFocusedWord() {
+    if (focusedWordIndex >= 0) {
+        // Use the existing resumeFromDefinedWord function but with focused word
+        definedWordIndex = focusedWordIndex;
+        resumeFromDefinedWord();
+    } else {
+        readText();
+    }
+}
+
+// Resume reading from the currently focused word
+function resumeFromFocusedWord() {
+    if (focusedWordIndex >= 0) {
+        // Use the existing resumeFromDefinedWord function but with focused word
+        definedWordIndex = focusedWordIndex;
+        resumeFromDefinedWord();
+    } else {
+        resumeReading();
+    }
+}
+
+// Modal focus management called by speech system (doesn't remove speech highlights)
+function setModalWordFocusFromSpeech(wordIndex) {
+    // Remove focus from previously focused word
+    if (modalFocusedWordIndex >= 0 && modalFocusedWordIndex < modalWordSpans.length) {
+        modalWordSpans[modalFocusedWordIndex].setAttribute('tabindex', '-1');
+        modalWordSpans[modalFocusedWordIndex].classList.remove('modal-keyboard-focused');
+    }
+    
+    // Set focus to new word
+    if (wordIndex >= 0 && wordIndex < modalWordSpans.length) {
+        modalFocusedWordIndex = wordIndex;
+        const wordElement = modalWordSpans[wordIndex];
+        
+        wordElement.setAttribute('tabindex', '0');
+        wordElement.classList.add('modal-keyboard-focused');
+        // Don't call wordElement.focus() - this prevents screen reader interruption
+        
+        // Don't remove speaking highlights - let them coexist with focus
+    }
+}
+
+// ARIA live region announcement functions
+function announceStatus(message) {
+    const statusElement = document.getElementById('upload-status');
+    if (statusElement) {
+        statusElement.textContent = message;
+    }
+}
+
+function announceError(message) {
+    const errorElement = document.getElementById('upload-errors');
+    if (errorElement) {
+        errorElement.textContent = message;
+    }
 }
