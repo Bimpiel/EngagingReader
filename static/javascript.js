@@ -4,8 +4,8 @@ const outputDiv = document.getElementById("text-display");
 const loadingOverlay = document.getElementById("loading-overlay");
 const dropArea = document.getElementById("drop-area");
 
-// Main speech synthesis variables
-let speechSynthesis = window.speechSynthesis;
+// Main speech synthesis variables  
+let speechSynthesis = window.speechSynthesis || window.webkitSpeechSynthesis;
 let mainSpeechUtterance = null;
 let currentText = "";
 let mainWords = [];

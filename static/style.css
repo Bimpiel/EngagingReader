@@ -24,6 +24,7 @@ body {
     background-color: #2E6F40;
     margin-top: 0;
     color: white;
+    font-size: 32pt; /* Fallback for older browsers */
     font-size: clamp(24pt, 6vw, 38pt); /* Optimized scaling from mobile to desktop */
     font-weight: 700;
     font-style: normal;
@@ -105,6 +106,7 @@ body {
     margin-top: clamp(2rem, 6vw, 5rem);
     line-height: 1.6;
     margin-bottom: clamp(2rem, 6vw, 5rem);
+    font-size: 2rem; /* Fallback for older browsers */
     font-size: clamp(1.2rem, 5vw, 3.2rem); /* Consistent text scaling across all devices */
     padding: clamp(1rem, 3vw, 2rem);
     max-width: 100%;
@@ -217,6 +219,7 @@ body {
     padding: clamp(15px, 4vw, 25px);
     background-color: #D8E1D9;
     height: 100%;
+    font-size: 2rem; /* Fallback for older browsers */
     font-size: clamp(1.2rem, 5vw, 3.2rem); /* Match main text sizing exactly */
     line-height: 1.6; /* Match main text line-height exactly */
     z-index: 1000;
@@ -240,6 +243,8 @@ body {
     position: fixed;
     bottom: clamp(40px, 8vw, 70px);
     left: 50%;
+    -webkit-transform: translateX(-50%);
+    -ms-transform: translateX(-50%);
     transform: translateX(-50%);
     display: flex;
     gap: clamp(8px, 2vw, 12px);
@@ -312,6 +317,8 @@ body {
     mask: var(--_m);
     -webkit-mask-composite: source-out;
     mask-composite: subtract;
+    /* Fallback for older browsers */
+    background: #2E6F40;
     animation: l3 1s infinite linear;
 }
 
@@ -330,6 +337,8 @@ body {
     position: fixed;
     bottom: clamp(15px, 4vw, 25px);
     left: 50%;
+    -webkit-transform: translateX(-50%);
+    -ms-transform: translateX(-50%);
     transform: translateX(-50%);
     display: none;
     gap: clamp(8px, 2vw, 12px);
