@@ -218,6 +218,7 @@ body {
     background-color: #D8E1D9;
     height: 100%;
     font-size: clamp(1.2rem, 5vw, 3.2rem); /* Match main text sizing exactly */
+    line-height: 1.6; /* Match main text line-height exactly */
     z-index: 1000;
     box-sizing: border-box;
     overflow-y: auto;
