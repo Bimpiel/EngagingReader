@@ -131,6 +131,7 @@ body {
     padding: clamp(1rem, 3vw, 2rem);
     max-width: 100%;
     word-wrap: break-word;
+    overflow-wrap: break-word; /* Modern browser support for word breaking */
 }
 
 /* ===== TEXT HIERARCHY WITHIN MAIN CONTENT ===== */
@@ -196,7 +197,8 @@ body {
     
     /* Reserve space to prevent reflow when bolded */
     letter-spacing: 0.5px; /* Slightly wider spacing to accommodate bold width */
-    white-space: nowrap; /* Prevent individual words from wrapping */
+    word-break: break-word; /* Allow long words to break when necessary */
+    overflow-wrap: break-word; /* Modern browser support for word breaking */
 }
 
 .word:hover {
