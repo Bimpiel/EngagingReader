@@ -386,8 +386,10 @@ Accrue means to build up or be added over time. In this context, it means the ex
 
 # === Run Flask App Server ===
 if __name__ == "__main__":
-    app.run(
-        debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",  # Enable debug mode from env
-        host="0.0.0.0",                                             # Bind to all interfaces
-        port=int(os.getenv("PORT", "5000"))                         # Use PORT from env or fallback to 5000
-    )
+    # Only run Flask development server when running directly (not through Gunicorn)
+    if not os.getenv("GUNICORN_RUNNING"):
+        app.run(
+            debug=os.getenv("FLASK_DEBUG", "false").lower() == "true",  # Enable debug mode from env
+            host="0.0.0.0",                                             # Bind to all interfaces
+            port=int(os.getenv("PORT", "5000"))                         # Use PORT from env or fallback to 5000
+        )
