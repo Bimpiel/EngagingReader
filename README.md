@@ -106,7 +106,7 @@ set GOOGLE_PROJECT=your-google-cloud-project-id
 ### 6. Run the Application
 
 ```bash
-python app.py
+gunicorn app:app
 ```
 
 The application will be available at `http://localhost:5000`
