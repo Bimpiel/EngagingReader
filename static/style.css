@@ -438,17 +438,63 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 50%;
-    width: clamp(50px, 12vw, 70px);
+    border-radius: 50px; /* Changed from 50% to create ellipse */
+    width: clamp(100px, 20vw, 140px); /* Wider to comfortably fit 1.25x */
     height: clamp(50px, 12vw, 70px);
-    min-width: 44px;
+    min-width: 90px; /* Increased min-width for ellipse shape */
     min-height: 44px;
     background-color: #45535B;
     color: #E5EAE5;
     font-size: clamp(3rem, 5vw, 3rem); 
     font-weight: 700; /* Bold */
-    cursor: default;
+    cursor: pointer;
     user-select: none;
+    position: relative;
+}
+
+.speed-display.active {
+    color: #FFD700; /* Yellow color when dropdown is open */
+}
+
+.speed-dropdown {
+    display: none;
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #45535B;
+    border-radius: 15px;
+    padding: clamp(12px, 3vw, 18px);
+    min-width: 120px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+.speed-dropdown.show {
+    display: flex;
+    flex-direction: column;
+    gap: clamp(8px, 2vw, 12px);
+}
+
+.speed-option {
+    font-size: calc(clamp(1.2rem, 5vw, 3.2rem) * 0.75 * 0.75); /* 3/4 of main body font, then 25% smaller = 56.25% */
+    color: #E5EAE5;
+    text-align: center;
+    padding: clamp(6px, 1.5vw, 10px);
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background-color 0.2s ease, font-weight 0.1s ease;
+    font-weight: 400; /* Normal weight by default */
+}
+
+.speed-option.speed-label {
+    font-weight: 700; /* "Speed" is always bolded */
+    cursor: default;
+    pointer-events: none;
+}
+
+.speed-option:hover:not(.speed-label) {
+    font-weight: 700; /* Bold on hover */
+    background-color: rgba(229, 234, 229, 0.1);
 }
 
 /* Front page controls styling */
@@ -458,6 +504,27 @@ body {
     bottom: auto;
     left: auto;
     transform: none;
+    display: flex;
+    gap: clamp(8px, 2vw, 12px);
+    padding: clamp(8px, 2vw, 12px);
+    box-shadow: 0 9px #2E6F40;
+    background-color: #95D3A6;
+    border: solid black 1px;
+    border-radius: 30px;
+    justify-content: center;
+}
+
+#front-page-controls button {
+    border: none;
+    border-radius: 50%;
+    width: clamp(50px, 12vw, 70px);
+    height: clamp(50px, 12vw, 70px);
+    min-width: 44px; /* Accessibility minimum */
+    min-height: 44px;
+    background-size: 100%;
+    background-position: center;
+    background-repeat: no-repeat;
+    cursor: pointer;
 }
 
 /* Front page play button states */

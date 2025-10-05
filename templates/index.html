@@ -47,7 +47,18 @@
     <div id="speech-controls" style="left: 50%;transform: translate(-50%, -50%);">
         <button id="playBtn"></button>
         <button id="pauseBtn"></button>
-        <div id="speedDisplay" class="speed-display">1x</div>
+        <div id="speedDisplay" class="speed-display">
+            1x
+            <div class="speed-dropdown">
+                <div class="speed-option speed-label">Speed</div>
+                <div class="speed-option" data-speed="0.45">.5x</div>
+                <div class="speed-option" data-speed="0.675">.75x</div>
+                <div class="speed-option" data-speed="0.9">1x</div>
+                <div class="speed-option" data-speed="1.125">1.25x</div>
+                <div class="speed-option" data-speed="1.35">1.5x</div>
+                <div class="speed-option" data-speed="1.8">2x</div>
+            </div>
+        </div>
     </div>
 
     <!-- Definition Modal -->
@@ -58,7 +69,18 @@
             <div class="modal-speech-controls">
                 <button id="modalPlayBtn"></button>
                 <button id="modalPauseBtn"></button>
-                <div id="modalSpeedDisplay" class="speed-display">1x</div>
+                <div id="modalSpeedDisplay" class="speed-display">
+                    1x
+                    <div class="speed-dropdown">
+                        <div class="speed-option speed-label">Speed</div>
+                        <div class="speed-option" data-speed="0.45">.5x</div>
+                        <div class="speed-option" data-speed="0.675">.75x</div>
+                        <div class="speed-option" data-speed="0.9">1x</div>
+                        <div class="speed-option" data-speed="1.125">1.25x</div>
+                        <div class="speed-option" data-speed="1.35">1.5x</div>
+                        <div class="speed-option" data-speed="1.8">2x</div>
+                    </div>
+                </div>
             </div>
             
             <div onclick="closeDefinitionModal()" class="close-btn">

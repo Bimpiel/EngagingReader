@@ -47,6 +47,10 @@ let isManuallyPaused = false;
 const playBtn = document.getElementById("playBtn");
 const pauseBtn = document.getElementById("pauseBtn");
 
+// Speed control variables
+let mainSpeechRate = 0.9;
+let modalSpeechRate = 0.9;
+
 // Update button states and icons based on playing status
 function updateButtonStates(isPlaying) {
     if (isPlaying) {
@@ -268,6 +272,10 @@ document.addEventListener('DOMContentLoaded', function() {
     playBtn.addEventListener('click', handlePlayClick);
     pauseBtn.addEventListener('click', handlePauseClick);
 
+    // Add event listeners for speed controls
+    setupSpeedControl('speedDisplay', 'main');
+    setupSpeedControl('modalSpeedDisplay', 'modal');
+
     // Drag and drop events
     dropArea.addEventListener('dragover', (e) => {
         e.preventDefault();
@@ -307,6 +315,97 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // File input change
     fileInput.addEventListener('change', uploadImage);
+});
+
+// Setup speed control for a specific speed display element
+function setupSpeedControl(displayId, context) {
+    const speedDisplay = document.getElementById(displayId);
+    if (!speedDisplay) return;
+    
+    const dropdown = speedDisplay.querySelector('.speed-dropdown');
+    const speedOptions = speedDisplay.querySelectorAll('.speed-option:not(.speed-label)');
+    
+    // Toggle dropdown on click
+    speedDisplay.addEventListener('click', function(event) {
+        // Close other dropdowns first
+        document.querySelectorAll('.speed-dropdown.show').forEach(otherDropdown => {
+            if (otherDropdown !== dropdown) {
+                otherDropdown.classList.remove('show');
+                otherDropdown.parentElement.classList.remove('active');
+            }
+        });
+        
+        // Toggle this dropdown
+        dropdown.classList.toggle('show');
+        speedDisplay.classList.toggle('active');
+        
+        // Prevent event from bubbling to document
+        event.stopPropagation();
+    });
+    
+    // Handle speed option selection
+    speedOptions.forEach(option => {
+        option.addEventListener('click', function(event) {
+            const speed = parseFloat(this.getAttribute('data-speed'));
+            
+            // Update the speed rate based on context
+            if (context === 'main') {
+                const wasPlaying = isMainSpeaking && !mainSpeechPaused;
+                const currentWordBeforeChange = mainCurrentWordIndex;
+                
+                mainSpeechRate = speed;
+                
+                // If currently playing, restart from current word with new speed
+                if (wasPlaying && mainCurrentWordIndex >= 0) {
+                    // Set the defined word to current position for seamless restart
+                    definedWordIndex = mainCurrentWordIndex;
+                    // Stop current speech
+                    speechSynthesis.cancel();
+                    // Small delay to ensure clean restart
+                    setTimeout(() => {
+                        resumeFromDefinedWord();
+                    }, 50);
+                }
+            } else if (context === 'modal') {
+                const wasPlaying = isModalSpeaking && !modalSpeechPaused;
+                const currentWordBeforeChange = modalCurrentWordIndex;
+                
+                modalSpeechRate = speed;
+                
+                // If currently playing, restart from current word with new speed
+                if (wasPlaying && modalCurrentWordIndex >= 0) {
+                    // Stop current speech
+                    speechSynthesis.cancel();
+                    // Restart from current position
+                    setTimeout(() => {
+                        restartModalFromWord(currentWordBeforeChange);
+                    }, 50);
+                }
+            }
+            
+            // Update display text
+            const displayText = speedDisplay.childNodes[0]; // Get the text node
+            if (displayText && displayText.nodeType === Node.TEXT_NODE) {
+                displayText.textContent = this.textContent;
+            }
+            
+            // Close dropdown
+            dropdown.classList.remove('show');
+            speedDisplay.classList.remove('active');
+            
+            event.stopPropagation();
+        });
+    });
+}
+
+// Close all dropdowns when clicking outside
+document.addEventListener('click', function(event) {
+    if (!event.target.closest('.speed-display')) {
+        document.querySelectorAll('.speed-dropdown.show').forEach(dropdown => {
+            dropdown.classList.remove('show');
+            dropdown.parentElement.classList.remove('active');
+        });
+    }
 });
 
 // Upload and process image
@@ -547,8 +646,8 @@ function readText() {
         });
     }
 
-    // Set default rate
-    mainSpeechUtterance.rate = 1;
+    // Set rate to current selection
+    mainSpeechUtterance.rate = mainSpeechRate;
 
     // Event handlers
     mainSpeechUtterance.onboundary = function(event) {
@@ -802,8 +901,8 @@ async function resumeFromDefinedWord() {
         mainSpeechUtterance.lang = 'en-US';
     }
 
-    // Set default rate
-    mainSpeechUtterance.rate = 1;
+    // Set rate to current selection
+    mainSpeechUtterance.rate = mainSpeechRate;
 
     // Event handlers
     mainSpeechUtterance.onboundary = function(event) {
@@ -1095,8 +1194,8 @@ async function readDefinitionAloud() {
         modalSpeechUtterance.lang = 'en-US';
     }
 
-    // Set default rate
-    modalSpeechUtterance.rate = 1;
+    // Set rate to current selection
+    modalSpeechUtterance.rate = modalSpeechRate;
 
     // Event handlers
     modalSpeechUtterance.onboundary = function(event) {
@@ -1185,6 +1284,96 @@ function stopDefinitionReading() {
     modalSpeechPaused = false;
     updateModalButtonStates(false);
     highlightModalCurrentWord(-1);
+}
+
+// Restart modal reading from a specific word index with new speed
+async function restartModalFromWord(wordIndex) {
+    if (wordIndex < 0 || !modalWords || !modalWordSpans) {
+        return;
+    }
+
+    // Set the current word index
+    modalCurrentWordIndex = wordIndex;
+    isModalSpeaking = true;
+    modalSpeechPaused = false;
+
+    // Create text starting from the specified word
+    const remainingWords = modalWords.slice(wordIndex);
+    const textToSpeak = remainingWords.join(' ');
+
+    // Create new utterance for the remaining text
+    modalSpeechUtterance = new SpeechSynthesisUtterance(textToSpeak);
+
+    // Get and set English voice
+    const englishVoice = await getEnglishVoice();
+    if (englishVoice) {
+        modalSpeechUtterance.voice = englishVoice;
+        modalSpeechUtterance.lang = englishVoice.lang;
+    } else {
+        modalSpeechUtterance.lang = 'en-US';
+    }
+
+    // Set rate to current selection
+    modalSpeechUtterance.rate = modalSpeechRate;
+
+    // Event handlers
+    modalSpeechUtterance.onboundary = function(event) {
+        if (event.name === 'word') {
+            const charIndex = event.charIndex;
+            let currentCharCount = 0;
+
+            // Find which word we're at based on character index (relative to remaining words)
+            for (let i = 0; i < remainingWords.length; i++) {
+                currentCharCount += remainingWords[i].length + (i === remainingWords.length - 1 ? 0 : 1);
+                if (currentCharCount > charIndex) {
+                    modalCurrentWordIndex = wordIndex + i;
+                    highlightModalCurrentWord(modalCurrentWordIndex);
+                    break;
+                }
+            }
+        }
+    };
+
+    modalSpeechUtterance.onstart = function() {
+        isModalSpeaking = true;
+        updateModalButtonStates(true);
+        clearAllModalKeyboardFocus();
+    };
+
+    modalSpeechUtterance.onend = function() {
+        isModalSpeaking = false;
+        modalSpeechPaused = false;
+        updateModalButtonStates(false);
+        modalCurrentWordIndex = 0;
+        highlightModalCurrentWord(-1);
+    };
+
+    modalSpeechUtterance.onpause = function() {
+        modalSpeechPaused = true;
+        updateModalButtonStates(false);
+    };
+
+    modalSpeechUtterance.onresume = function() {
+        modalSpeechPaused = false;
+        updateModalButtonStates(true);
+    };
+
+    modalSpeechUtterance.onerror = function(event) {
+        if (event.error !== 'interrupted' && event.error !== 'canceled') {
+            console.error('Modal SpeechSynthesis error:', event);
+            isModalSpeaking = false;
+            stopDefinitionReading();
+        }
+    };
+
+    // Highlight the starting word
+    highlightModalCurrentWord(wordIndex);
+
+    // Set button states for resuming modal speech
+    updateModalButtonStates(true);
+
+    // Start speaking from the specified word
+    speechSynthesis.speak(modalSpeechUtterance);
 }
 
 // Handle global keyboard events
