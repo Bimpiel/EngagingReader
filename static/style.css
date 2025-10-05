@@ -434,6 +434,50 @@ body {
     cursor: pointer;
 }
 
+.speed-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    width: clamp(50px, 12vw, 70px);
+    height: clamp(50px, 12vw, 70px);
+    min-width: 44px;
+    min-height: 44px;
+    background-color: #45535B;
+    color: #E5EAE5;
+    font-size: clamp(3rem, 5vw, 3rem); 
+    font-weight: 700; /* Bold */
+    cursor: default;
+    user-select: none;
+}
+
+/* Front page controls styling */
+#front-page-controls {
+    margin-top: clamp(30px, 6vw, 50px);
+    position: relative;
+    bottom: auto;
+    left: auto;
+    transform: none;
+}
+
+/* Front page play button states */
+#frontPlayBtn {
+    background-image: url('../static/assets/Play\ Button-unselected.png');
+}
+
+#frontPlayBtn.playing {
+    background-image: url('../static/assets/Play\ Button-selected.png');
+}
+
+/* Front page pause button states */
+#frontPauseBtn {
+    background-image: url('../static/assets/Pause\ Button-Selected.png');
+}
+
+#frontPauseBtn.playing {
+    background-image: url('../static/assets/Pause\ Button-unselected.png');
+}
+
 /* Play button states */
 #playBtn {
     background-image: url('../static/assets/Play Button-unselected.png');
