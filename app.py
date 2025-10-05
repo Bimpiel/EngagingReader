@@ -5,6 +5,7 @@ import base64                     # To encode image data into base64
 import json                       # To work with JSON data structures
 import logging                    # For logging runtime events and debugging
 import io                         # For in-memory binary operations
+import time                       # For timing operations
 from flask import Flask, render_template, request, jsonify  # Flask web framework
 from google import genai         # Google's Gemini (GenAI) client
 from google.genai import types   # Needed to construct content parts and config
@@ -118,6 +119,9 @@ def standardize_image(input_image_bytes: bytes, options: dict = None) -> bytes:
 
 # === Core Function: Process Uploaded File and Extract Markdown ===
 def process_file(file_path):
+    file_process_start = time.time()
+    logger.info(f"[TIMING] process_file() started for: {file_path}")
+    
     # Create a prompt to guide Gemini on how to extract the data
     text_prompt = types.Part.from_text(text="""Act as an expert document intelligence agent. Your mission is to analyze the document (image or PDF), process its content based on the rules below, and generate a clean, well-structured Markdown document.
 
@@ -157,8 +161,11 @@ Footnotes:
 Completeness: Ensure all extracted (or translated) text, including any URLs, is present in the final output.""")
 
     # Read and process the file (image or PDF)
+    read_start = time.time()
     with open(file_path, "rb") as file:
         original_file_bytes = file.read()
+    read_duration = time.time() - read_start
+    logger.info(f"[TIMING] File read in {read_duration:.3f} seconds ({len(original_file_bytes)} bytes)")
     
     # Determine file type based on extension
     _, file_extension = os.path.splitext(file_path.lower())
@@ -167,14 +174,16 @@ Completeness: Ensure all extracted (or translated) text, including any URLs, is 
         # Handle PDF files directly - no standardization needed
         file_data = original_file_bytes
         mime_type = "application/pdf"
-        logger.info(f"Processing PDF file: {len(original_file_bytes)} bytes")
+        logger.info(f"[TIMING] Processing PDF file: {len(original_file_bytes)} bytes")
         
     else:
         # Handle image files with standardization
         try:
+            standardize_start = time.time()
             # Standardize the image to improve OCR accuracy and reduce processing time
             standardized_image_bytes = standardize_image(original_file_bytes)
-            logger.info(f"Image standardized: {len(original_file_bytes)} -> {len(standardized_image_bytes)} bytes")
+            standardize_duration = time.time() - standardize_start
+            logger.info(f"[TIMING] Image standardized in {standardize_duration:.3f} seconds: {len(original_file_bytes)} -> {len(standardized_image_bytes)} bytes")
             
             # Use standardized image data
             file_data = standardized_image_bytes
@@ -220,14 +229,27 @@ Completeness: Ensure all extracted (or translated) text, including any URLs, is 
     )
 
     # Stream response from Gemini and concatenate result
+    gemini_start = time.time()
+    logger.info(f"[TIMING] Starting Gemini API call")
     output_text = ""
+    first_chunk_received = False
     for chunk in client.models.generate_content_stream(
         model="gemini-2.5-flash",
         contents=contents,
         config=config,
     ):
         if chunk.text:  # Only add text if it's not None
+            if not first_chunk_received:
+                first_chunk_time = time.time() - gemini_start
+                logger.info(f"[TIMING] First chunk received in {first_chunk_time:.3f} seconds")
+                first_chunk_received = True
             output_text += chunk.text
+    
+    gemini_duration = time.time() - gemini_start
+    logger.info(f"[TIMING] Gemini API completed in {gemini_duration:.3f} seconds")
+    
+    total_process_duration = time.time() - file_process_start
+    logger.info(f"[TIMING] Total process_file() duration: {total_process_duration:.3f} seconds")
 
     return output_text  # Return the markdown-formatted output
 
@@ -239,6 +261,10 @@ def index():
 # === Flask Route: Image Upload Endpoint ===
 @app.route("/upload", methods=["POST"])
 def upload_file():
+    # Start timing the entire upload process
+    start_time = time.time()
+    logger.info(f"[TIMING] Upload request received at {start_time}")
+    
     # Validate presence of file
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -248,12 +274,23 @@ def upload_file():
         return jsonify({"error": "No selected file"}), 400
 
     # Save file to uploads folder
+    save_start = time.time()
     filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
     file.save(filepath)
+    save_duration = time.time() - save_start
+    logger.info(f"[TIMING] File saved in {save_duration:.3f} seconds")
 
     try:
         # Process file (image or PDF) and return the extracted markdown text
+        process_start = time.time()
+        logger.info(f"[TIMING] Starting file processing at {process_start}")
         extracted_markdown = process_file(filepath)
+        process_duration = time.time() - process_start
+        logger.info(f"[TIMING] File processing completed in {process_duration:.3f} seconds")
+        
+        total_duration = time.time() - start_time
+        logger.info(f"[TIMING] Total upload-to-response time: {total_duration:.3f} seconds")
+        
         return jsonify({
             "markdown": extracted_markdown,
             "filename": file.filename
