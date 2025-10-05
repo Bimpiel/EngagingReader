@@ -445,7 +445,7 @@ body {
     min-height: 44px;
     background-color: #45535B;
     color: #E5EAE5;
-    font-size: clamp(3rem, 5vw, 3rem); 
+    font-size: clamp(2rem, 5vw, 3rem); /* Scales better on mobile */
     font-weight: 700; /* Bold */
     cursor: pointer;
     user-select: none;
@@ -476,7 +476,7 @@ body {
 }
 
 .speed-option {
-    font-size: calc(clamp(1.2rem, 5vw, 3.2rem) * 0.75 * 0.75); /* 3/4 of main body font, then 25% smaller = 56.25% */
+    font-size: clamp(1.5rem, 3vw, 2rem); /* Simple responsive sizing for dropdown options */
     color: #E5EAE5;
     text-align: center;
     padding: clamp(6px, 1.5vw, 10px);
