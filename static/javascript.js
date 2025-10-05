@@ -47,9 +47,8 @@ let isManuallyPaused = false;
 const playBtn = document.getElementById("playBtn");
 const pauseBtn = document.getElementById("pauseBtn");
 
-// Speed control variables
-let mainSpeechRate = 0.9;
-let modalSpeechRate = 0.9;
+// Speed control variables - unified speed for both main and modal
+let speechRate = 0.9;
 
 // Update button states and icons based on playing status
 function updateButtonStates(isPlaying) {
@@ -347,13 +346,27 @@ function setupSpeedControl(displayId, context) {
     speedOptions.forEach(option => {
         option.addEventListener('click', function(event) {
             const speed = parseFloat(this.getAttribute('data-speed'));
+            const speedText = this.textContent;
             
-            // Update the speed rate based on context
+            // Update the unified speech rate
+            speechRate = speed;
+            
+            // Update both main and modal displays
+            const mainSpeedDisplay = document.getElementById('speedDisplay');
+            const modalSpeedDisplay = document.getElementById('modalSpeedDisplay');
+            
+            [mainSpeedDisplay, modalSpeedDisplay].forEach(display => {
+                if (display) {
+                    const displayText = display.childNodes[0]; // Get the text node
+                    if (displayText && displayText.nodeType === Node.TEXT_NODE) {
+                        displayText.textContent = speedText;
+                    }
+                }
+            });
+            
+            // Handle playback restart based on context
             if (context === 'main') {
                 const wasPlaying = isMainSpeaking && !mainSpeechPaused;
-                const currentWordBeforeChange = mainCurrentWordIndex;
-                
-                mainSpeechRate = speed;
                 
                 // If currently playing, restart from current word with new speed
                 if (wasPlaying && mainCurrentWordIndex >= 0) {
@@ -370,8 +383,6 @@ function setupSpeedControl(displayId, context) {
                 const wasPlaying = isModalSpeaking && !modalSpeechPaused;
                 const currentWordBeforeChange = modalCurrentWordIndex;
                 
-                modalSpeechRate = speed;
-                
                 // If currently playing, restart from current word with new speed
                 if (wasPlaying && modalCurrentWordIndex >= 0) {
                     // Stop current speech
@@ -381,12 +392,6 @@ function setupSpeedControl(displayId, context) {
                         restartModalFromWord(currentWordBeforeChange);
                     }, 50);
                 }
-            }
-            
-            // Update display text
-            const displayText = speedDisplay.childNodes[0]; // Get the text node
-            if (displayText && displayText.nodeType === Node.TEXT_NODE) {
-                displayText.textContent = this.textContent;
             }
             
             // Close dropdown
@@ -647,7 +652,7 @@ function readText() {
     }
 
     // Set rate to current selection
-    mainSpeechUtterance.rate = mainSpeechRate;
+    mainSpeechUtterance.rate = speechRate;
 
     // Event handlers
     mainSpeechUtterance.onboundary = function(event) {
@@ -902,7 +907,7 @@ async function resumeFromDefinedWord() {
     }
 
     // Set rate to current selection
-    mainSpeechUtterance.rate = mainSpeechRate;
+    mainSpeechUtterance.rate = speechRate;
 
     // Event handlers
     mainSpeechUtterance.onboundary = function(event) {
@@ -1195,7 +1200,7 @@ async function readDefinitionAloud() {
     }
 
     // Set rate to current selection
-    modalSpeechUtterance.rate = modalSpeechRate;
+    modalSpeechUtterance.rate = speechRate;
 
     // Event handlers
     modalSpeechUtterance.onboundary = function(event) {
@@ -1314,7 +1319,7 @@ async function restartModalFromWord(wordIndex) {
     }
 
     // Set rate to current selection
-    modalSpeechUtterance.rate = modalSpeechRate;
+    modalSpeechUtterance.rate = speechRate;
 
     // Event handlers
     modalSpeechUtterance.onboundary = function(event) {
