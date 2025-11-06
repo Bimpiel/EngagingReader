@@ -6,6 +6,9 @@ import json                       # To work with JSON data structures
 import logging                    # For logging runtime events and debugging
 import io                         # For in-memory binary operations
 import time                       # For timing operations
+import uuid                       # For generating unique filenames
+import re                         # For filename sanitization
+from pathlib import Path          # For secure path handling
 from flask import Flask, render_template, request, jsonify  # Flask web framework
 from google import genai         # Google's Gemini (GenAI) client
 from google.genai import types   # Needed to construct content parts and config
@@ -273,10 +276,49 @@ def upload_file():
     if file.filename == "":
         return jsonify({"error": "No selected file"}), 400
 
+    # Sanitize filename to prevent path traversal attacks
+    # Extract only the filename (not path) and remove dangerous characters
+    original_filename = file.filename
+    if not original_filename:
+        return jsonify({"error": "Invalid filename"}), 400
+    
+    # Get only the basename to prevent path traversal
+    safe_basename = os.path.basename(original_filename)
+    
+    # Remove any remaining path separators and dangerous characters
+    safe_basename = re.sub(r'[^\w\s.-]', '', safe_basename)
+    
+    # Limit filename length
+    safe_basename = safe_basename[:255]
+    
+    # Generate unique filename to prevent collisions
+    file_extension = os.path.splitext(safe_basename)[1].lower()
+    
+    # Validate file extension is allowed
+    allowed_extensions = ('.jpg', '.jpeg', '.png', '.heic', '.heif', '.webp', '.pdf')
+    if not file_extension or file_extension not in allowed_extensions:
+        return jsonify({"error": "File type not allowed. Supported formats: JPG, PNG, HEIC, WebP, PDF"}), 400
+    
+    # Generate unique filename with the validated extension
+    unique_filename = f"{uuid.uuid4().hex}{file_extension}"
+    
+    # Use Path for secure path joining (prevents path traversal)
+    upload_folder = Path(app.config["UPLOAD_FOLDER"]).resolve()
+    filepath = upload_folder / unique_filename
+    
+    # Ensure the filepath is within the upload folder (extra safety check)
+    try:
+        filepath.resolve().relative_to(upload_folder.resolve())
+    except ValueError:
+        return jsonify({"error": "Invalid file path"}), 400
+    
     # Save file to uploads folder
     save_start = time.time()
-    filepath = os.path.join(app.config["UPLOAD_FOLDER"], file.filename)
-    file.save(filepath)
+    try:
+        file.save(str(filepath))
+    except Exception as save_error:
+        logger.error(f"Error saving file: {str(save_error)}")
+        return jsonify({"error": "Failed to save file. Please try again."}), 500
     save_duration = time.time() - save_start
     logger.info(f"[TIMING] File saved in {save_duration:.3f} seconds")
 
@@ -284,7 +326,7 @@ def upload_file():
         # Process file (image or PDF) and return the extracted markdown text
         process_start = time.time()
         logger.info(f"[TIMING] Starting file processing at {process_start}")
-        extracted_markdown = process_file(filepath)
+        extracted_markdown = process_file(str(filepath))
         process_duration = time.time() - process_start
         logger.info(f"[TIMING] File processing completed in {process_duration:.3f} seconds")
         
@@ -300,8 +342,8 @@ def upload_file():
         return jsonify({"error": str(e)}), 500
     finally:
         # Delete uploaded file to free up space
-        if os.path.exists(filepath):
-            os.remove(filepath)
+        if filepath.exists():
+            filepath.unlink()
 
 # === Flask Route: Context-Based Word Definition ===
 @app.route("/get-definition", methods=["POST"])
