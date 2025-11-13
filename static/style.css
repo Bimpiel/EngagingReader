@@ -49,14 +49,27 @@ body {
 #upload-container {
     display: flex;
     width: 100%;
-    height: 100%;
-    justify-content: center;
+    min-height: auto;
+    justify-content: flex-start;
     align-items: center;
+    flex-direction: column;
+    padding-bottom: clamp(20px, 4vw, 40px);
+}
+
+.disclaimer {
+    margin-top: clamp(5px, 3vw, 10px);
+    font-size: clamp(1rem, 3vw, 1.5rem);
+    color: black;
+    font-weight: 700;
+    text-align: center;
+    max-width: 90%;
+    line-height: 1.2;
+    padding: 0 clamp(15px, 4vw, 25px);
 }
 
 .drop-area {
     display: flex;
-    margin-top: clamp(70px, 12vw, 160px); /* Optimized spacing for all devices */
+    margin-top: clamp(70px, 10vw, 100px); /* Reduced to keep content above fold */
     flex-direction: column;
     justify-content: center;
     align-items: center;
@@ -65,7 +78,7 @@ body {
     cursor: pointer;
     transition: background-color 0.3s ease;
     width: 100%;
-    height: 100%;
+    height: auto;
     padding: clamp(10px, 3vw, 20px);
     box-sizing: border-box;
 }
