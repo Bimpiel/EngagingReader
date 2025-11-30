@@ -19,4 +19,4 @@ services:
         value: "10000"
       - key: GUNICORN_RUNNING
         value: "true"
-    plan: free
+    plan: starter
