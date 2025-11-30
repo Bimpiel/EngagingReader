@@ -3,7 +3,7 @@ services:
     name: EngagingReader
     env: python
     buildCommand: "pip install -r requirements.txt"
-    startCommand: "gunicorn app:app --timeout 300 --graceful-timeout 300"    
+    startCommand: "gunicorn app:app --timeout 300"
     envVars:
       - key: GOOGLE_APPLICATION_CREDENTIALS
         value: service_account_file.json
