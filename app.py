@@ -8,6 +8,8 @@ import io                         # For in-memory binary operations
 import time                       # For timing operations
 import uuid                       # For generating unique filenames
 import re                         # For filename sanitization
+import threading                  # For background job processing
+from datetime import datetime, timedelta  # For job cleanup
 from pathlib import Path          # For secure path handling
 from flask import Flask, render_template, request, jsonify  # Flask web framework
 from google import genai         # Google's Gemini (GenAI) client
@@ -31,6 +33,49 @@ app = Flask(__name__)
 UPLOAD_FOLDER = "uploads"  # Folder to temporarily store uploaded files
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)  # Ensure the folder exists
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER  # Flask config for file uploads
+
+# === Job Storage for Async Processing ===
+job_storage = {}
+job_lock = threading.Lock()
+
+def create_job():
+    """Create a new job and return its ID"""
+    job_id = str(uuid.uuid4())
+    with job_lock:
+        job_storage[job_id] = {
+            "status": "processing",
+            "created_at": datetime.now(),
+            "result": None,
+            "error": None
+        }
+    return job_id
+
+def update_job(job_id, status=None, result=None, error=None):
+    """Update job status"""
+    with job_lock:
+        if job_id in job_storage:
+            if status:
+                job_storage[job_id]["status"] = status
+            if result is not None:
+                job_storage[job_id]["result"] = result
+            if error is not None:
+                job_storage[job_id]["error"] = error
+
+def get_job(job_id):
+    """Get job status"""
+    with job_lock:
+        return job_storage.get(job_id)
+
+def cleanup_old_jobs():
+    """Remove jobs older than 1 hour"""
+    with job_lock:
+        cutoff = datetime.now() - timedelta(hours=1)
+        to_remove = [
+            job_id for job_id, job in job_storage.items()
+            if job["created_at"] < cutoff
+        ]
+        for job_id in to_remove:
+            del job_storage[job_id]
 
 # === Google Gemini Client Initialization ===
 def initialize_genai_client():
@@ -261,13 +306,9 @@ Completeness: Ensure all extracted (or translated) text, including any URLs, is 
 def index():
     return render_template("index.html")  # Loads index.html from templates folder
 
-# === Flask Route: Image Upload Endpoint ===
+# === Flask Route: Image Upload Endpoint (Async) ===
 @app.route("/upload", methods=["POST"])
 def upload_file():
-    # Start timing the entire upload process
-    start_time = time.time()
-    logger.info(f"[TIMING] Upload request received at {start_time}")
-    
     # Validate presence of file
     if "file" not in request.files:
         return jsonify({"error": "No file uploaded"}), 400
@@ -277,7 +318,6 @@ def upload_file():
         return jsonify({"error": "No selected file"}), 400
 
     # Sanitize filename to prevent path traversal attacks
-    # Extract only the filename (not path) and remove dangerous characters
     original_filename = file.filename
     if not original_filename:
         return jsonify({"error": "Invalid filename"}), 400
@@ -313,37 +353,64 @@ def upload_file():
         return jsonify({"error": "Invalid file path"}), 400
     
     # Save file to uploads folder
-    save_start = time.time()
     try:
         file.save(str(filepath))
     except Exception as save_error:
         logger.error(f"Error saving file: {str(save_error)}")
         return jsonify({"error": "Failed to save file. Please try again."}), 500
-    save_duration = time.time() - save_start
-    logger.info(f"[TIMING] File saved in {save_duration:.3f} seconds")
 
-    try:
-        # Process file (image or PDF) and return the extracted markdown text
-        process_start = time.time()
-        logger.info(f"[TIMING] Starting file processing at {process_start}")
-        extracted_markdown = process_file(str(filepath))
-        process_duration = time.time() - process_start
-        logger.info(f"[TIMING] File processing completed in {process_duration:.3f} seconds")
-        
-        total_duration = time.time() - start_time
-        logger.info(f"[TIMING] Total upload-to-response time: {total_duration:.3f} seconds")
-        
-        return jsonify({
-            "markdown": extracted_markdown,
-            "filename": file.filename
-        })
-    except Exception as e:
-        logger.error(f"Error processing image: {str(e)}")
-        return jsonify({"error": str(e)}), 500
-    finally:
-        # Delete uploaded file to free up space
-        if filepath.exists():
-            filepath.unlink()
+    # Create job and start background processing
+    job_id = create_job()
+    logger.info(f"Created job {job_id} for file {original_filename}")
+    
+    # Start background thread to process file
+    def process_in_background():
+        try:
+            logger.info(f"[JOB {job_id}] Starting file processing")
+            extracted_markdown = process_file(str(filepath))
+            update_job(job_id, status="completed", result={
+                "markdown": extracted_markdown,
+                "filename": original_filename
+            })
+            logger.info(f"[JOB {job_id}] Processing completed")
+        except Exception as e:
+            logger.error(f"[JOB {job_id}] Error processing file: {str(e)}")
+            update_job(job_id, status="failed", error=str(e))
+        finally:
+            # Clean up file
+            if filepath.exists():
+                filepath.unlink()
+            # Clean up old jobs periodically
+            cleanup_old_jobs()
+    
+    thread = threading.Thread(target=process_in_background)
+    thread.daemon = True
+    thread.start()
+    
+    # Return immediately with job ID
+    return jsonify({
+        "job_id": job_id,
+        "status": "processing"
+    }), 202  # 202 Accepted status code
+
+# === Flask Route: Check Job Status ===
+@app.route("/status/<job_id>", methods=["GET"])
+def get_job_status(job_id):
+    job = get_job(job_id)
+    
+    if not job:
+        return jsonify({"error": "Job not found"}), 404
+    
+    response = {
+        "status": job["status"]
+    }
+    
+    if job["status"] == "completed":
+        response["result"] = job["result"]
+    elif job["status"] == "failed":
+        response["error"] = job["error"]
+    
+    return jsonify(response)
 
 # === Flask Route: Context-Based Word Definition ===
 @app.route("/get-definition", methods=["POST"])

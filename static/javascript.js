@@ -465,41 +465,83 @@ async function uploadImage() {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Failed to process image");
+            throw new Error(data.error || "Failed to upload file");
         }
 
-        // Sanitize and render markdown
-        const dirtyHtml = marked.parse(data.markdown || "");
-        const cleanHtml = DOMPurify.sanitize(dirtyHtml);
+        // Get job ID and poll for results
+        if (!data.job_id) {
+            throw new Error("Server did not return a job ID. Please try again.");
+        }
 
-        outputDiv.innerHTML = cleanHtml;
+        const jobId = data.job_id;
+        let pollAttempts = 0;
+        const maxPollAttempts = 300; // 5 minutes max (300 * 1 second)
+        const pollInterval = 1000; // Poll every 1 second
 
-        // Immediately wrap words in spans for clickable definitions
-        wrapWordsInSpans(outputDiv);
+        const pollForResults = async () => {
+            try {
+                const statusResponse = await fetch(`/status/${jobId}`);
+                const statusData = await statusResponse.json();
+                
+                if (!statusResponse.ok) {
+                    throw new Error(statusData.error || "Failed to check status");
+                }
+                
+                if (statusData.status === "completed") {
+                    // Processing complete, render the markdown
+                    const dirtyHtml = marked.parse(statusData.result.markdown || "");
+                    const cleanHtml = DOMPurify.sanitize(dirtyHtml);
+                    
+                    outputDiv.innerHTML = cleanHtml;
+                    wrapWordsInSpans(outputDiv);
+                    initializeWordNavigation();
+                    
+                    // Enable play button and store the current text
+                    currentText = cleanHtml;
+                    
+                    // Set initial button states (not playing)
+                    updateButtonStates(false);
 
-        // Initialize navigation system after words are wrapped
-        initializeWordNavigation();
+                    // Show speech controls after successful processing
+                    document.getElementById('speech-controls').style.display = 'flex';
 
-        // Enable play button and store the current text
-        currentText = cleanHtml;
-        
-        // Set initial button states (not playing)
-        updateButtonStates(false);
+                    // Hide upload container and show content
+                    document.getElementById('upload-container').style.display = 'none';
+                    
+                    loadingOverlay.style.display = 'none';
+                    announceStatus("Text extracted successfully. Use spacebar to start reading or tab to navigate words.");
+                } else if (statusData.status === "failed") {
+                    throw new Error(statusData.error || "Processing failed");
+                } else if (statusData.status === "processing") {
+                    // Still processing, poll again
+                    pollAttempts++;
+                    if (pollAttempts >= maxPollAttempts) {
+                        throw new Error("Processing timed out. Please try again.");
+                    }
+                    setTimeout(pollForResults, pollInterval);
+                } else {
+                    // Unexpected status - log and treat as error
+                    console.error("Unexpected job status:", statusData.status);
+                    throw new Error("Unexpected processing status. Please try again.");
+                }
+            } catch (error) {
+                console.error("Error polling for results:", error);
+                loadingOverlay.style.display = 'none';
+                showError(error.message);
+                announceError("Failed to process file. Please try again.");
+                // Keep speech controls hidden on error
+                document.getElementById('speech-controls').style.display = 'none';
+            }
+        };
 
-        // Show speech controls after successful processing
-        document.getElementById('speech-controls').style.display = 'flex';
-
-        // Hide upload container and show content
-        document.getElementById('upload-container').style.display = 'none';
-        
-        announceStatus("Text extracted successfully. Use spacebar to start reading or tab to navigate words.");
+        // Start polling
+        pollForResults();
 
     } catch (error) {
         showError(error.message);
         announceError("Failed to process file. Please try again.");
         // Keep speech controls hidden on error
         document.getElementById('speech-controls').style.display = 'none';
-    } finally {
         loadingOverlay.style.display = 'none';
     }
 }
